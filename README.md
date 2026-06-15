@@ -1,1 +1,1 @@
-# linkatlas-extension
+# LinkAtlas – AI Bookmark Organizer
