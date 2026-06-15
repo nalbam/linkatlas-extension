@@ -43,7 +43,7 @@ export interface FlatNode {
 }
 
 /** Ordering applied recursively within every folder. */
-export type SortKey = 'manual' | 'title' | 'domain' | 'recent'
+export type SortKey = 'manual' | 'title' | 'domain' | 'recent' | 'importance'
 
 export function isFolder(node: TreeNode): node is FolderNode {
   return node.type === 'folder'

@@ -4,6 +4,38 @@ All notable changes to LinkAtlas are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — Phase 3: AI Analysis Flow
+
+### Added
+
+- AI analysis pipeline: each bookmark is analyzed into
+  `{summary, category, subcategory, tags, importance, reason}` via the chosen
+  provider, running as a background service-worker job over a typed Port with
+  conservative concurrency (3) and incremental caching.
+- Privacy + cost gate (`AnalyzeDialog`): shows scope count, provider, estimated
+  input/output tokens, and an approximate cost **before** anything is sent;
+  nothing leaves the browser until the user confirms.
+- On-demand host permission for `https://api.openai.com/*`, requested from the
+  user gesture on confirm (added to `optional_host_permissions`).
+- Pure, tested analysis core: `buildAnalyzeInput` (bookmark + metadata → model
+  input) and `estimateUsage` (token/cost estimate reusing the real prompt).
+- Analysis overlay in the tree: per-bookmark importance badge (colored by score)
+  and category chip; summary + tags in the row tooltip.
+- New filtering/sorting: **sort by importance**, **filter by category**, and
+  **filter by tag** — all reading from the analysis map through the existing
+  pure derivation pipeline.
+- Tag statistics drawer (`TagStatsPanel`): tag frequencies across analyzed
+  bookmarks; click a tag to filter by it.
+- `analysisStore` (Zustand) with throttled result merging and a cache hydrated on
+  load; `createProvider` now accepts a model option.
+
+### Notes
+
+- 53 passing unit tests; `typecheck` and `build` are green.
+- Analysis uses the OpenAI provider; Gemini and Claude remain drop-in behind the
+  same `AIProvider` contract (the factory reports them as not-yet-implemented).
+- Re-runs are incremental (successful analyses are skipped); cost is an estimate.
+
 ## [0.2.0] — Phase 2: URL Metadata Collection
 
 ### Added
@@ -62,5 +94,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   management, and apply-to-Chrome are scheduled for later phases (see ROADMAP).
 - 28 passing unit tests; `typecheck` and `build` are green.
 
+[0.3.0]: https://github.com/nalbam/linkatlas-extension/releases/tag/v0.3.0
 [0.2.0]: https://github.com/nalbam/linkatlas-extension/releases/tag/v0.2.0
 [0.1.0]: https://github.com/nalbam/linkatlas-extension/releases/tag/v0.1.0

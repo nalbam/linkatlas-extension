@@ -1,21 +1,31 @@
 /**
  * MV3 service worker entry.
  *
- * Owns long-running, teardown-surviving work. Phase 2 adds the metadata
- * collection job: the options page connects over a Port, requests a `collect`,
- * and the worker fetches + caches each page's metadata while streaming progress.
+ * Owns long-running, teardown-surviving work over `chrome.runtime` Ports:
+ * - Phase 2: metadata collection (fetch + parse + cache each page).
+ * - Phase 3: AI analysis (provider.analyzeBookmark per item, cached).
  */
 
-import { METADATA_PORT, type ClientMessage } from './messages'
+import { runAnalysisJob } from './analysisJob'
+import {
+  ANALYSIS_PORT,
+  METADATA_PORT,
+  type AnalysisClientMessage,
+  type ClientMessage,
+} from './messages'
 import { runMetadataJob } from './metadataJob'
+import { createProvider } from '@/ai/providers'
 
 chrome.runtime.onInstalled.addListener((details) => {
   console.info('[LinkAtlas] installed:', details.reason)
 })
 
 chrome.runtime.onConnect.addListener((port) => {
-  if (port.name !== METADATA_PORT) return
+  if (port.name === METADATA_PORT) handleMetadataPort(port)
+  else if (port.name === ANALYSIS_PORT) handleAnalysisPort(port)
+})
 
+function handleMetadataPort(port: chrome.runtime.Port) {
   const controller = new AbortController()
   let started = false
 
@@ -23,19 +33,48 @@ chrome.runtime.onConnect.addListener((port) => {
     if (message.type === 'collect') {
       if (started) return
       started = true
-      void runMetadataJob(message.urls, (workerMessage) => {
-        try {
-          port.postMessage(workerMessage)
-        } catch {
-          // Port already closed by the client — nothing to do.
-        }
-      }, controller.signal)
+      void runMetadataJob(message.urls, (workerMessage) => safePost(port, workerMessage), controller.signal)
     } else if (message.type === 'cancel') {
       controller.abort()
     }
   })
-
   port.onDisconnect.addListener(() => controller.abort())
-})
+}
+
+function handleAnalysisPort(port: chrome.runtime.Port) {
+  const controller = new AbortController()
+  let started = false
+
+  port.onMessage.addListener((message: AnalysisClientMessage) => {
+    if (message.type === 'analyze') {
+      if (started) return
+      started = true
+      const model = message.model ?? ''
+      try {
+        const provider = createProvider(message.provider, message.apiKey, { model: message.model })
+        void runAnalysisJob(
+          message.items,
+          provider,
+          model,
+          (workerMessage) => safePost(port, workerMessage),
+          controller.signal,
+        )
+      } catch (error) {
+        safePost(port, { type: 'error', message: (error as Error).message })
+      }
+    } else if (message.type === 'cancel') {
+      controller.abort()
+    }
+  })
+  port.onDisconnect.addListener(() => controller.abort())
+}
+
+function safePost(port: chrome.runtime.Port, message: unknown) {
+  try {
+    port.postMessage(message)
+  } catch {
+    // Port already closed by the client — nothing to do.
+  }
+}
 
 export {}

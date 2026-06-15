@@ -10,9 +10,10 @@ export default defineManifest({
   description: pkg.description,
   // Read & (later) reorganize bookmarks; persist settings + metadata cache.
   permissions: ['bookmarks', 'storage'],
-  // Page fetching for metadata is opt-in: requested at runtime from a user
-  // gesture (the "Collect metadata" button), never granted up front.
-  optional_host_permissions: ['<all_urls>'],
+  // All host access is opt-in, requested at runtime from a user gesture:
+  // - <all_urls>: page fetching for metadata ("Collect metadata").
+  // - api.openai.com: direct AI analysis calls ("Analyze").
+  optional_host_permissions: ['<all_urls>', 'https://api.openai.com/*'],
   action: {
     default_popup: 'src/popup/index.html',
     default_title: 'LinkAtlas',

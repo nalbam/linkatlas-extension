@@ -11,6 +11,8 @@ export type IconName =
   | 'collapse'
   | 'close'
   | 'refresh'
+  | 'sparkle'
+  | 'tag'
 
 // Stroke-based 24x24 paths, rendered at any size via the `size` prop.
 const PATHS: Record<IconName, string> = {
@@ -25,6 +27,8 @@ const PATHS: Record<IconName, string> = {
   collapse: 'M7 16l5-5 5 5M7 10l5-5 5 5',
   close: 'M6 6l12 12M18 6L6 18',
   refresh: 'M4 12a8 8 0 0 1 13.7-5.6L20 8M20 4v4h-4M20 12a8 8 0 0 1-13.7 5.6L4 16M4 20v-4h4',
+  sparkle: 'M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z',
+  tag: 'M3 12l8-8h7a2 2 0 0 1 2 2v7l-8 8a2 2 0 0 1-2.8 0L3 14.8a2 2 0 0 1 0-2.8zM16 8h.01',
 }
 
 interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'name'> {

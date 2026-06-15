@@ -1,14 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
+import { buildAnalyzeInput } from '@/analysis/analyzeInput'
+import { hasFreshAnalysis } from '@/analysis/cache'
 import { collectBookmarkUrls, collectDomains, collectFolderIds, countTree } from '@/bookmarks/tree'
 import { isFolder, type TreeNode } from '@/bookmarks/types'
-import { selectVisibleRows } from '@/state/selectors'
+import { selectFilteredBookmarks, selectVisibleRows, type ViewState } from '@/state/selectors'
+import { useAnalysisStore } from '@/state/analysisStore'
 import { useMetadataStore } from '@/state/metadataStore'
+import { useSettingsStore } from '@/state/settingsStore'
 import { useUiStore } from '@/state/uiStore'
 import { Button } from '@/ui/components/Button'
 import { Icon } from '@/ui/components/Icon'
+import { AnalysisBar } from './components/AnalysisBar'
+import { AnalyzeDialog } from './components/AnalyzeDialog'
 import { BookmarkTreeView } from './components/BookmarkTreeView'
 import { MetadataBar } from './components/MetadataBar'
 import { SettingsPanel } from './components/SettingsPanel'
+import { TagStatsPanel } from './components/TagStatsPanel'
 import { Toolbar } from './components/Toolbar'
 import { useBookmarkTree } from './hooks/useBookmarkTree'
 
@@ -20,34 +27,63 @@ export function App() {
 
   const searchQuery = useUiStore((s) => s.searchQuery)
   const domainFilter = useUiStore((s) => s.domainFilter)
+  const categoryFilter = useUiStore((s) => s.categoryFilter)
+  const tagFilter = useUiStore((s) => s.tagFilter)
   const sortKey = useUiStore((s) => s.sortKey)
   const expandedIds = useUiStore((s) => s.expandedIds)
   const toggleExpanded = useUiStore((s) => s.toggleExpanded)
   const expandAll = useUiStore((s) => s.expandAll)
   const collapseAll = useUiStore((s) => s.collapseAll)
+  const setTagFilter = useUiStore((s) => s.setTagFilter)
 
   const metadataByUrl = useMetadataStore((s) => s.byUrl)
   const loadMetadataFromCache = useMetadataStore((s) => s.loadFromCache)
 
+  const analysisByUrl = useAnalysisStore((s) => s.byUrl)
+  const loadAnalysisFromCache = useAnalysisStore((s) => s.loadFromCache)
+  const startAnalysis = useAnalysisStore((s) => s.startAnalysis)
+
+  const provider = useSettingsStore((s) => s.provider)
+  const apiKey = useSettingsStore((s) => s.apiKeys[provider])
+
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [analyzeOpen, setAnalyzeOpen] = useState(false)
+  const [statsOpen, setStatsOpen] = useState(false)
   const [didInit, setDidInit] = useState(false)
+
+  const view: ViewState = { searchQuery, domainFilter, categoryFilter, tagFilter, sortKey, expandedIds }
 
   const counts = useMemo(() => countTree(roots), [roots])
   const domains = useMemo(() => collectDomains(roots), [roots])
   const allUrls = useMemo(() => collectBookmarkUrls(roots), [roots])
+  const categories = useMemo(() => {
+    const set = new Set<string>()
+    for (const a of Object.values(analysisByUrl)) {
+      if (a.status === 'ok' && a.category) set.add(a.category)
+    }
+    return [...set].sort((x, y) => x.localeCompare(y))
+  }, [analysisByUrl])
   const rows = useMemo(
-    () => selectVisibleRows(roots, { searchQuery, domainFilter, sortKey, expandedIds }),
-    [roots, searchQuery, domainFilter, sortKey, expandedIds],
+    () => selectVisibleRows(roots, view, analysisByUrl),
+    [roots, searchQuery, domainFilter, categoryFilter, tagFilter, sortKey, expandedIds, analysisByUrl],
   )
+  // Scope for "Analyze": bookmarks matching current filters that lack a fresh
+  // analysis (independent of expand state).
+  const analyzeItems = useMemo(() => {
+    return selectFilteredBookmarks(roots, view, analysisByUrl)
+      .filter((b) => !hasFreshAnalysis(analysisByUrl[b.url]))
+      .map((b) => ({ url: b.url, input: buildAnalyzeInput(b, metadataByUrl[b.url]) }))
+  }, [roots, searchQuery, domainFilter, categoryFilter, tagFilter, analysisByUrl, metadataByUrl])
   const shownBookmarks = useMemo(
     () => rows.reduce((n, row) => (row.node.type === 'bookmark' ? n + 1 : n), 0),
     [rows],
   )
 
-  // Hydrate any previously cached metadata once on mount.
+  // Hydrate cached metadata + analysis once on mount.
   useEffect(() => {
     void loadMetadataFromCache()
-  }, [loadMetadataFromCache])
+    void loadAnalysisFromCache()
+  }, [loadMetadataFromCache, loadAnalysisFromCache])
 
   // Open the top-level roots once so the user sees structure immediately.
   useEffect(() => {
@@ -80,12 +116,20 @@ export function App() {
 
       <Toolbar
         domains={domains}
+        categories={categories}
         onExpandAll={() => expandAll(collectFolderIds(roots))}
         onCollapseAll={collapseAll}
         onRefresh={() => void refetch()}
       />
 
       <MetadataBar allUrls={allUrls} />
+
+      <AnalysisBar
+        pendingCount={analyzeItems.length}
+        statsOpen={statsOpen}
+        onAnalyze={() => setAnalyzeOpen(true)}
+        onToggleStats={() => setStatsOpen((open) => !open)}
+      />
 
       <main className="relative flex-1 overflow-hidden">
         {isLoading ? (
@@ -107,6 +151,7 @@ export function App() {
           <BookmarkTreeView
             rows={rows}
             metadataByUrl={metadataByUrl}
+            analysisByUrl={analysisByUrl}
             onToggle={toggleExpanded}
             onOpen={(url) => window.open(url, '_blank', 'noopener')}
           />
@@ -116,6 +161,27 @@ export function App() {
       <footer className="border-t border-border px-4 py-1.5 text-xs text-muted">
         {shownBookmarks.toLocaleString()} shown
       </footer>
+
+      <AnalyzeDialog
+        open={analyzeOpen}
+        onClose={() => setAnalyzeOpen(false)}
+        items={analyzeItems}
+        provider={provider}
+        hasKey={apiKey.trim().length > 0}
+        model=""
+        onConfirm={() => startAnalysis({ provider, apiKey, items: analyzeItems })}
+      />
+
+      <TagStatsPanel
+        open={statsOpen}
+        analysisByUrl={analysisByUrl}
+        activeTag={tagFilter}
+        onPickTag={(tag) => {
+          setTagFilter(tag)
+          setStatsOpen(false)
+        }}
+        onClose={() => setStatsOpen(false)}
+      />
 
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>

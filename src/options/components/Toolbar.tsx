@@ -11,6 +11,7 @@ const SORT_OPTIONS: ReadonlyArray<{ value: SortKey; label: string }> = [
   { value: 'title', label: 'Title (A–Z)' },
   { value: 'domain', label: 'Domain' },
   { value: 'recent', label: 'Recently added' },
+  { value: 'importance', label: 'Importance' },
 ]
 
 const selectClass =
@@ -18,13 +19,24 @@ const selectClass =
 
 interface ToolbarProps {
   domains: string[]
+  categories: string[]
   onExpandAll: () => void
   onCollapseAll: () => void
   onRefresh: () => void
 }
 
-export function Toolbar({ domains, onExpandAll, onCollapseAll, onRefresh }: ToolbarProps) {
-  const { domainFilter, sortKey, setSearchQuery, setDomainFilter, setSortKey } = useUiStore()
+export function Toolbar({ domains, categories, onExpandAll, onCollapseAll, onRefresh }: ToolbarProps) {
+  const {
+    domainFilter,
+    categoryFilter,
+    tagFilter,
+    sortKey,
+    setSearchQuery,
+    setDomainFilter,
+    setCategoryFilter,
+    setTagFilter,
+    setSortKey,
+  } = useUiStore()
 
   // Local text drives an immediate input while the store update is debounced,
   // so typing never re-runs the full filter pipeline on every keystroke.
@@ -51,6 +63,35 @@ export function Toolbar({ domains, onExpandAll, onCollapseAll, onRefresh }: Tool
           </option>
         ))}
       </select>
+
+      {categories.length > 0 && (
+        <select
+          className={selectClass}
+          value={categoryFilter}
+          onChange={(event) => setCategoryFilter(event.target.value)}
+          aria-label="Filter by category"
+        >
+          <option value="">All categories</option>
+          {categories.map((category) => (
+            <option key={category} value={category}>
+              {category}
+            </option>
+          ))}
+        </select>
+      )}
+
+      {tagFilter && (
+        <button
+          type="button"
+          onClick={() => setTagFilter('')}
+          title="Clear tag filter"
+          className="inline-flex items-center gap-1 rounded-md border border-accent/40 bg-accent/15 px-2 py-1.5 text-sm text-slate-100"
+        >
+          <Icon name="tag" size={14} />
+          {tagFilter}
+          <Icon name="close" size={14} />
+        </button>
+      )}
 
       <select
         className={selectClass}

@@ -24,6 +24,8 @@ function tree(): TreeNode[] {
 const base: ViewState = {
   searchQuery: '',
   domainFilter: '',
+  categoryFilter: '',
+  tagFilter: '',
   sortKey: 'manual',
   expandedIds: new Set(),
 }
@@ -61,3 +63,42 @@ describe('selectVisibleRows', () => {
     ])
   })
 })
+
+describe('selectVisibleRows with analysis', () => {
+  const analysis = {
+    'https://react.dev': storedAnalysis({ category: 'Development', tags: ['ui'], importance: 9 }),
+    'https://vuejs.org': storedAnalysis({ category: 'Learning', tags: ['ui', 'docs'], importance: 4 }),
+  }
+  const expanded = new Set(['bar', 'dev'])
+
+  it('sorts leaves by importance (highest first)', () => {
+    const rows = selectVisibleRows(tree(), { ...base, sortKey: 'importance', expandedIds: expanded }, analysis)
+    expect(rows.filter((r) => r.node.type === 'bookmark').map((r) => r.node.title)).toEqual([
+      'React',
+      'Vue',
+    ])
+  })
+
+  it('filters by category', () => {
+    const rows = selectVisibleRows(tree(), { ...base, categoryFilter: 'Learning' }, analysis)
+    expect(rows.map((r) => r.node.title)).toEqual(['Bar', 'Dev', 'Vue'])
+  })
+
+  it('filters by tag', () => {
+    const rows = selectVisibleRows(tree(), { ...base, tagFilter: 'docs' }, analysis)
+    expect(rows.map((r) => r.node.title)).toEqual(['Bar', 'Dev', 'Vue'])
+  })
+})
+
+function storedAnalysis(partial: { category: string; tags: string[]; importance: number }) {
+  return {
+    url: '',
+    status: 'ok' as const,
+    analyzedAt: 0,
+    model: 'test',
+    summary: '',
+    subcategory: '',
+    reason: '',
+    ...partial,
+  }
+}

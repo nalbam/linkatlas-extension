@@ -10,11 +10,17 @@ interface UiState {
   searchQuery: string
   /** Selected domain, or '' for "all domains". */
   domainFilter: string
+  /** Selected AI category, or '' for "all categories". */
+  categoryFilter: string
+  /** Selected AI tag, or '' for "all tags". */
+  tagFilter: string
   sortKey: SortKey
   expandedIds: Set<BookmarkId>
 
   setSearchQuery: (query: string) => void
   setDomainFilter: (domain: string) => void
+  setCategoryFilter: (category: string) => void
+  setTagFilter: (tag: string) => void
   setSortKey: (key: SortKey) => void
   toggleExpanded: (id: BookmarkId) => void
   expandAll: (ids: readonly BookmarkId[]) => void
@@ -24,11 +30,15 @@ interface UiState {
 export const useUiStore = create<UiState>((set) => ({
   searchQuery: '',
   domainFilter: '',
+  categoryFilter: '',
+  tagFilter: '',
   sortKey: 'manual',
   expandedIds: new Set(),
 
   setSearchQuery: (searchQuery) => set({ searchQuery }),
   setDomainFilter: (domainFilter) => set({ domainFilter }),
+  setCategoryFilter: (categoryFilter) => set({ categoryFilter }),
+  setTagFilter: (tagFilter) => set({ tagFilter }),
   setSortKey: (sortKey) => set({ sortKey }),
   toggleExpanded: (id) =>
     set((state) => {

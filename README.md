@@ -6,10 +6,11 @@ Chrome bookmarks, visualizes them as a fast virtualized tree, and (in upcoming
 phases) uses pluggable LLM providers to summarize, categorize, tag, and
 reorganize them — all locally driven, with your API key, on your machine.
 
-> **Status — Phase 2 (metadata collection).** Read, visualize, search, filter,
-> and sort your real bookmarks, and collect per-page metadata (favicon,
-> description, OpenGraph, keywords) on demand. AI analysis, category management,
-> and apply-to-Chrome land in later phases — see [ROADMAP.md](./ROADMAP.md).
+> **Status — Phase 3 (AI analysis).** Read, visualize, search, filter, and sort
+> your real bookmarks; collect per-page metadata; and analyze bookmarks with AI
+> to generate categories, tags, summaries, and importance — behind an explicit
+> cost/consent gate. Category management and apply-to-Chrome land next — see
+> [ROADMAP.md](./ROADMAP.md).
 
 ## Features
 
@@ -18,16 +19,20 @@ reorganize them — all locally driven, with your API key, on your machine.
 - **Virtualized tree view** that stays smooth at 10k+ nodes (only visible rows
   are mounted).
 - **Search** across bookmark title, URL, and domain — matching paths auto-expand.
-- **Filter by domain** and **sort** (original order, title, domain, recently added).
+- **Filter** by domain, AI category, or AI tag; **sort** by original order, title,
+  domain, recently added, or **importance**.
 - **Collapse / expand** folders individually or all at once.
 - **Metadata collection** — fetch each page's favicon, title, description,
   OpenGraph, and keywords with batching, rate limiting, timeouts, and an
   incremental cache. Favicons and descriptions render inline in the tree.
+- **AI analysis** — generate `{summary, category, subcategory, tags, importance,
+  reason}` per bookmark via a pluggable provider (OpenAI implemented). A
+  cost/consent gate shows the scope, token estimate, and approximate cost before
+  anything is sent; results overlay as importance badges + category chips, with a
+  tag-statistics drawer.
 - **Popup** with quick bookmark/folder counts and a one-click "Open Manager".
 - **Settings** for choosing an AI provider and storing its API key locally
-  (`chrome.storage.local`) — ready for the analysis phase.
-- **Pluggable AI abstraction** with a fully implemented OpenAI provider
-  (Structured Outputs).
+  (`chrome.storage.local`).
 
 ## Tech Stack
 
@@ -68,16 +73,18 @@ npm run build    # Production build into dist/
 
 ```
 src/
-├─ background/   MV3 service worker: metadata job + typed Port messages
+├─ background/   MV3 service worker: metadata + analysis jobs over typed Ports
 ├─ popup/        Toolbar popup: stats + "Open Manager"
-├─ options/      Full-page manager app (tree, toolbar, metadata bar, settings)
-│  ├─ components/  BookmarkTreeView, Toolbar, MetadataBar, SettingsPanel
+├─ options/      Full-page manager app (tree, toolbar, action bars, panels)
+│  ├─ components/  BookmarkTreeView, Toolbar, MetadataBar, AnalysisBar,
+│  │               AnalyzeDialog, TagStatsPanel, SettingsPanel
 │  └─ hooks/       useBookmarkTree, useDebouncedValue
 ├─ services/     Framework-agnostic data access (bookmarkService)
 ├─ ai/           Provider abstraction + OpenAI implementation + prompts
+├─ analysis/     Pure analyze-input + token/cost estimate + cache + types
 ├─ bookmarks/    Domain model + Chrome adapter + pure tree utilities
 ├─ metadata/     Pure HTML parser + resilient fetcher + cache + types
-├─ state/        Zustand stores (ui, settings, metadata) + pure selectors
+├─ state/        Zustand stores (ui, settings, metadata, analysis) + selectors
 ├─ ui/           Reusable presentational components
 └─ utils/        Query client, chrome.storage adapter, batch runner
 ```
@@ -90,9 +97,13 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for the layering and data flow, and
 LinkAtlas never transmits your bookmarks anywhere on its own. API keys are stored
 only in `chrome.storage.local`.
 
-**Metadata collection is opt-in.** The extension ships with no host access; the
-`<all_urls>` permission is `optional` and requested only when you click "Collect
-metadata", via Chrome's own consent prompt. Fetches use `credentials: 'omit'`,
-and results are cached locally. When AI analysis ships, sending data to a
-provider will likewise be explicit and scoped (selected / folder / all) with a
-token-cost estimate shown first — see the Privacy section of the roadmap.
+**All network access is opt-in.** The extension ships with no host access; host
+permissions are `optional` and requested via Chrome's own consent prompt only
+when you act:
+
+- **Metadata** — `<all_urls>` is requested on "Collect metadata"; fetches use
+  `credentials: 'omit'` and results are cached locally.
+- **AI analysis** — `api.openai.com` is requested on confirm. Before any send,
+  the Analyze dialog shows the exact scope (which bookmarks), an estimated token
+  count, and an approximate cost; nothing leaves the browser until you confirm.
+  Scope follows your active filters, so you can analyze just a subset.

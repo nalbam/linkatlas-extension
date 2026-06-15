@@ -1,9 +1,11 @@
+import { type AnalyzeItem, type StoredAnalysis } from '@/analysis/types'
+import { type ProviderId } from '@/ai/types'
 import { type BookmarkMetadata } from '@/metadata/types'
 
 /**
- * Typed contract for the metadata-collection job, run over a long-lived
- * `chrome.runtime` Port. The options page connects, sends a `collect` request,
- * and receives streamed `progress` / `result` messages until `done`.
+ * Typed contracts for the background jobs, run over long-lived `chrome.runtime`
+ * Ports. A client connects, sends a request, and receives streamed
+ * `progress` / `result` messages until `done`.
  */
 
 export const METADATA_PORT = 'linkatlas-metadata'
@@ -15,5 +17,17 @@ export type ClientMessage =
 export type WorkerMessage =
   | { type: 'progress'; total: number; done: number }
   | { type: 'result'; meta: BookmarkMetadata }
+  | { type: 'done'; total: number; ok: number; failed: number }
+  | { type: 'error'; message: string }
+
+export const ANALYSIS_PORT = 'linkatlas-analysis'
+
+export type AnalysisClientMessage =
+  | { type: 'analyze'; provider: ProviderId; apiKey: string; model?: string; items: AnalyzeItem[] }
+  | { type: 'cancel' }
+
+export type AnalysisWorkerMessage =
+  | { type: 'progress'; total: number; done: number }
+  | { type: 'result'; analysis: StoredAnalysis }
   | { type: 'done'; total: number; ok: number; failed: number }
   | { type: 'error'; message: string }

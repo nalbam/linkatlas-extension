@@ -8,14 +8,22 @@ export class ProviderNotImplementedError extends Error {
   }
 }
 
+export interface CreateProviderOptions {
+  model?: string
+}
+
 /**
  * Factory for AI providers. OpenAI is fully implemented; Gemini and Claude
  * share the same `AIProvider` contract and slot in here in a later phase.
  */
-export function createProvider(id: ProviderId, apiKey: string): AIProvider {
+export function createProvider(
+  id: ProviderId,
+  apiKey: string,
+  options: CreateProviderOptions = {},
+): AIProvider {
   switch (id) {
     case 'openai':
-      return new OpenAIProvider(apiKey)
+      return new OpenAIProvider(apiKey, { model: options.model })
     case 'gemini':
     case 'claude':
       throw new ProviderNotImplementedError(id)

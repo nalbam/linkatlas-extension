@@ -11,13 +11,16 @@ Surfaces   popup/ · options/ (full-page app) · background/ (MV3 service worker
 UI         ui/components · options/components + hooks
 State      state/ (Zustand stores) + selectors (pure) · utils/queryClient
 Services   services/ (framework-agnostic data access)
-Domain     bookmarks/ (model + tree utils) · metadata/ (parser/fetcher/cache) · ai/ (abstraction + prompts)
-Adapters   bookmarks/chromeBookmarks · metadata/cache · ai/providers/* · utils/chromeStorage · background job
+Domain     bookmarks/ (model + tree utils) · metadata/ (parser/fetcher/cache)
+           analysis/ (input/estimate/cache) · ai/ (abstraction + prompts)
+Adapters   chromeBookmarks · metadata/cache · analysis/cache · ai/providers/*
+           utils/chromeStorage · background jobs (metadata + analysis)
 ```
 
 Dependencies point downward only. `bookmarks/tree.ts`, `state/selectors.ts`,
-`metadata/parseHtml.ts`, `utils/batch.ts`, and `ai/prompts.ts` import nothing
-from React or Chrome, which is what keeps them fast and trivially testable.
+`metadata/parseHtml.ts`, `utils/batch.ts`, `analysis/estimate.ts`,
+`analysis/analyzeInput.ts`, and `ai/prompts.ts` import nothing from React or
+Chrome, which is what keeps them fast and trivially testable.
 
 ## Data Flow (read path)
 
@@ -58,6 +61,27 @@ parsing is pure string/regex (`metadata/parseHtml.ts`) — which also makes it
 unit-testable. Metadata is keyed by URL in `metadataStore`, never embedded in the
 Query tree, and merged into rows at render.
 
+## Data Flow (analysis path)
+
+```
+AnalyzeDialog (privacy + cost gate)
+  → estimateUsage(inputs)                 (token/cost preview, pure)
+  → chrome.permissions.request(api.openai.com)
+  → analysisStore.startAnalysis           (filtered bookmarks lacking analysis)
+  → Port "linkatlas-analysis" → background
+        createProvider(provider, apiKey, {model})
+        runAnalysisJob: runBatch(items, provider.analyzeBookmark, concurrency=3)
+          → setManyCachedAnalysis (incremental) → post {progress|result|done}
+  → analysisStore merges results (throttled) into byUrl
+  → selectVisibleRows uses analysis for importance sort + category/tag filter
+  → rows show importance badge + category chip; TagStatsPanel aggregates tags
+```
+
+The analysis path mirrors the metadata path (same Port + `runBatch` + cache +
+store pattern), differing only in the worker (`provider.analyzeBookmark` instead
+of `fetchBookmarkMetadata`). The **scope** is the bookmarks matching the active
+filters (`selectFilteredBookmarks`), so filtering narrows what gets sent.
+
 ## Key Decisions
 
 - **CRXJS + Vite** for MV3 bundling: the manifest (`src/manifest.config.ts`) is
@@ -79,9 +103,13 @@ Query tree, and merged into rows at render.
   json_schema`) for schema-guaranteed results.
 - **Local-only secrets**: API keys persist through a `chrome.storage.local`
   Zustand adapter (`utils/chromeStorage.ts`) — never bundled, never synced.
-- **On-demand host access**: page fetching uses `optional_host_permissions`
-  (`<all_urls>`), requested from the user gesture on "Collect metadata". The
-  extension ships with zero host access.
+- **On-demand host access**: every host is `optional_host_permissions`, requested
+  from a user gesture — `<all_urls>` on "Collect metadata", `api.openai.com` on
+  Analyze confirm. The extension ships with zero host access.
+- **AI sending behind a gate**: `AnalyzeDialog` shows scope + token/cost estimate
+  and requires explicit confirm before any provider call. The estimate reuses the
+  real prompt builder so it tracks what is actually sent. Cost rates live in one
+  constant (`analysis/estimate.ts`), labelled approximate.
 
 ## Module Map
 
@@ -94,26 +122,33 @@ Query tree, and merged into rows at render.
 | `metadata/parseHtml.ts` | Pure DOM-free HTML → metadata extraction. |
 | `metadata/fetchMetadata.ts` | Resilient single-URL fetch (timeout/redirect/error). |
 | `metadata/cache.ts` | `chrome.storage.local` metadata cache + freshness. |
+| `analysis/analyzeInput.ts` | Build model input from bookmark + metadata (pure). |
+| `analysis/estimate.ts` | Token/cost estimate for the privacy gate (pure). |
+| `analysis/cache.ts` | `chrome.storage.local` analysis cache + freshness. |
 | `utils/batch.ts` | Concurrency-limited batch runner (rate limit + progress + abort). |
-| `background/messages.ts` | Typed Port message contract. |
+| `background/messages.ts` | Typed Port message contracts (metadata + analysis). |
 | `background/metadataJob.ts` | Fetch + cache + stream job. |
-| `state/uiStore.ts` | Search / filter / sort / expanded view state. |
+| `background/analysisJob.ts` | Analyze + cache + stream job. |
+| `state/uiStore.ts` | Search / domain / category / tag / sort / expanded state. |
 | `state/settingsStore.ts` | Provider choice + API keys (persisted). |
 | `state/metadataStore.ts` | Collected metadata (`byUrl`) + job progress (Port client). |
-| `state/selectors.ts` | `selectVisibleRows` derivation pipeline. |
+| `state/analysisStore.ts` | AI analysis (`byUrl`) + job progress (Port client). |
+| `state/selectors.ts` | `selectVisibleRows` + `selectFilteredBookmarks`. |
 | `ai/types.ts` | `AIProvider`, `BookmarkAnalysis`, `AnalyzeInput`. |
 | `ai/prompts.ts` | System prompt, JSON schema, `normalizeAnalysis`, parsing. |
 | `ai/providers/OpenAIProvider.ts` | OpenAI Chat Completions client. |
 | `ai/providers/index.ts` | `createProvider` factory. |
 | `options/App.tsx` | Composition root for the manager. |
-| `background/index.ts` | Service worker lifecycle + metadata Port router. |
+| `background/index.ts` | Service worker lifecycle + metadata/analysis Port routers. |
 
 ## Testing Strategy
 
 Pure modules carry the test weight: `bookmarks/tree`, `state/selectors`,
 `metadata/parseHtml`, `metadata/fetchMetadata` (injected `fetch`), `utils/batch`,
-`ai/prompts`, and `ai/providers/OpenAIProvider` (injected `fetch`). This covers
-search/filter/sort/flatten, the derivation pipeline, HTML extraction,
-fetch error/timeout/redirect handling, batch concurrency/abort, response
+`analysis/analyzeInput`, `analysis/estimate`, `ai/prompts`, and
+`ai/providers/OpenAIProvider` (injected `fetch`). This covers
+search/filter/sort/flatten, the derivation pipeline (including importance sort +
+category/tag filters), HTML extraction, fetch error/timeout/redirect handling,
+batch concurrency/abort, input building, usage estimation, response
 normalization, and the provider contract — all without a browser or network.
 Run with `npm test`.

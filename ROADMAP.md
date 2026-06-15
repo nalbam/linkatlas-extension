@@ -14,7 +14,7 @@ evaluated against the quality gates before the next begins.
 - [x] AI provider abstraction + OpenAI implementation (Structured Outputs, tested).
 - [x] Docs: README / ARCHITECTURE / ROADMAP / CHANGELOG.
 
-## Phase 2 — URL Metadata Collection ✅ (current)
+## Phase 2 — URL Metadata Collection ✅
 
 - [x] Fetch per-bookmark metadata: title, favicon, description, OpenGraph,
       keywords (background service-worker fetch + DOM-free parser).
@@ -22,18 +22,19 @@ evaluated against the quality gates before the next begins.
 - [x] Metadata cache in `chrome.storage.local`; incremental refresh.
 - [x] Show favicons and descriptions in the tree rows.
 - [x] On-demand `<all_urls>` host permission via `optional_host_permissions`.
-- [ ] Refinements: per-folder/selection scoping, "force refresh" of fresh
-      records, and surfacing the favicon/keywords beyond the row tooltip.
 
-## Phase 3 — AI Analysis Flow
+## Phase 3 — AI Analysis Flow ✅ (current)
 
-- [ ] Wire `createProvider` + metadata into an analysis pipeline (background job).
-- [ ] Privacy gate: "Analyze selected / folder / all" with explicit confirmation.
-- [ ] Token-cost estimate shown **before** sending.
-- [ ] Persist `BookmarkAnalysis` per bookmark; overlay category/tags/importance
-      in the UI; enable **sort by importance** and **filter by tag/category**.
-- [ ] Tag statistics view (counts, dedup) and incremental re-analysis.
+- [x] Wire `createProvider` + metadata into an analysis pipeline (background job).
+- [x] Privacy gate with explicit confirmation; scope follows the active filters.
+- [x] Token-cost estimate shown **before** sending.
+- [x] Persist analysis per bookmark; overlay category/importance in the UI;
+      **sort by importance** and **filter by category/tag**.
+- [x] Tag statistics view (counts, dedup) and incremental re-analysis.
 - [ ] Add Gemini and Claude providers behind the existing `AIProvider` contract.
+- [ ] Refinements: model selector + custom categories in Settings; per-folder
+      scope picker; "re-analyze" of already-analyzed bookmarks; per-bookmark
+      detail view (summary, subcategory, reason).
 
 ## Phase 4 — Category & Tag Management
 
@@ -49,27 +50,27 @@ evaluated against the quality gates before the next begins.
 - [ ] Post-apply summary (moved / created / merged / deleted counts).
 - [ ] Rollback support (snapshot + restore).
 
-## Quality Gates — Phase 2 self-assessment
+## Quality Gates — Phase 3 self-assessment
 
-Scored for the cumulative deliverable through Phase 2. Target is ≥ 8; sub-8
+Scored for the cumulative deliverable through Phase 3. Target is ≥ 8; sub-8
 items carry an explicit action.
 
 | Dimension | Score | Notes |
 | --- | --- | --- |
-| Architecture | 9 | Clean layering; pure DOM-free metadata core; SW job over a typed Port; provider abstraction ready. |
-| UX | 8 | Favicons + descriptions in rows, progress bar, cancel, incremental re-runs. Keyboard nav and richer metadata surfacing still pending. |
-| Performance | 8 | Virtualized rows; concurrency-limited fetch; throttled store merges for large jobs. Live 10k-node + large-job profiling still pending. |
-| Maintainability | 9 | Small focused modules (~2.3k LOC), 43 unit tests, pure cores tested without browser/network. |
-| Security | 8 | Keys local-only; host access is `optional_host_permissions`, requested on demand from a user gesture; `credentials: 'omit'` on fetches. |
+| Architecture | 9 | Two SW jobs share one Port/batch/cache/store pattern; provider abstraction now exercised end-to-end; pure cores throughout. |
+| UX | 8 | Importance/category overlays, tag stats, cost gate, progress/cancel. Per-bookmark detail view + model selector still pending. |
+| Performance | 8 | Virtualized rows; concurrency-limited jobs; throttled merges. Live 10k-node + large-job profiling still pending. |
+| Maintainability | 9 | Small focused modules (~3.0k LOC), 53 unit tests; analysis/metadata cores tested without browser/network. |
+| Security | 9 | Keys local-only; every host (`<all_urls>`, `api.openai.com`) is opt-in via user gesture; explicit cost/scope gate before any send; `credentials: 'omit'`. |
 
 ### Actions to maintain/raise scores
 
 - **Perf:** profile with a 5k–10k synthetic set — scroll FPS, initial flatten,
-  and a full metadata job; tune concurrency / flush interval if needed.
-- **UX:** keyboard navigation, an "expand to match" affordance, and a panel
-  surfacing full metadata (keywords, OG image) per bookmark.
-- **Security:** keep host access opt-in; when AI sending lands (Phase 3), add the
-  token-cost + explicit-scope gate before any provider call.
+  and full metadata/analysis jobs; tune concurrency / flush interval if needed.
+- **UX:** per-bookmark detail panel (summary/subcategory/reason), a model +
+  custom-category selector in Settings, keyboard navigation.
+- **Coverage:** add Gemini/Claude providers (contract is ready) so the abstraction
+  is proven by more than one implementation.
 
 ## Technical Debt & TODOs
 
@@ -85,5 +86,11 @@ items carry an explicit action.
   pure logic. Add interaction tests when management/DnD (Phase 4) lands.
 - Editable working-tree store intentionally omitted until Phase 4 (would be
   unused before then).
-- Metadata `description`/`keywords` are surfaced inline/tooltip only; a richer
-  per-bookmark detail view is a Phase 3 UX item.
+- Metadata `description`/`keywords` and analysis `summary`/`subcategory`/`reason`
+  are surfaced via the row tooltip only; a richer per-bookmark detail view is
+  pending.
+- No model selector or custom-category steering in Settings yet; analysis uses
+  the provider's default model. Already-analyzed bookmarks can't be re-analyzed
+  from the UI without clearing storage.
+- Only the OpenAI provider is wired for analysis; Gemini/Claude are contract-ready
+  but not implemented.

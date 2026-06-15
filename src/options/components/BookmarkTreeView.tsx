@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
+import { type StoredAnalysis } from '@/analysis/types'
 import { type FlatNode } from '@/bookmarks/types'
 import { type BookmarkMetadata } from '@/metadata/types'
 import { TreeNodeRow } from '@/ui/components/TreeNodeRow'
@@ -9,6 +10,7 @@ const ROW_HEIGHT = 34
 interface BookmarkTreeViewProps {
   rows: FlatNode[]
   metadataByUrl: Record<string, BookmarkMetadata>
+  analysisByUrl: Record<string, StoredAnalysis>
   onToggle: (id: string) => void
   onOpen: (url: string) => void
 }
@@ -21,6 +23,7 @@ interface BookmarkTreeViewProps {
 export function BookmarkTreeView({
   rows,
   metadataByUrl,
+  analysisByUrl,
   onToggle,
   onOpen,
 }: BookmarkTreeViewProps) {
@@ -40,7 +43,9 @@ export function BookmarkTreeView({
       >
         {virtualizer.getVirtualItems().map((item) => {
           const row = rows[item.index]
-          const metadata = row.node.type === 'bookmark' ? metadataByUrl[row.node.url] : undefined
+          const url = row.node.type === 'bookmark' ? row.node.url : undefined
+          const metadata = url ? metadataByUrl[url] : undefined
+          const analysis = url ? analysisByUrl[url] : undefined
           return (
             <div
               key={item.key}
@@ -53,7 +58,13 @@ export function BookmarkTreeView({
                 transform: `translateY(${item.start}px)`,
               }}
             >
-              <TreeNodeRow row={row} metadata={metadata} onToggle={onToggle} onOpen={onOpen} />
+              <TreeNodeRow
+                row={row}
+                metadata={metadata}
+                analysis={analysis}
+                onToggle={onToggle}
+                onOpen={onOpen}
+              />
             </div>
           )
         })}

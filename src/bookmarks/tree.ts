@@ -76,6 +76,19 @@ export function collectBookmarkUrls(roots: readonly TreeNode[]): string[] {
   return urls
 }
 
+/** All bookmark nodes in the tree, in depth-first order. */
+export function collectBookmarks(roots: readonly TreeNode[]): BookmarkNode[] {
+  const out: BookmarkNode[] = []
+  const walk = (nodes: readonly TreeNode[]) => {
+    for (const node of nodes) {
+      if (isFolder(node)) walk(node.children)
+      else out.push(node)
+    }
+  }
+  walk(roots)
+  return out
+}
+
 /** All folder ids in the tree — used to drive "expand all". */
 export function collectFolderIds(roots: readonly TreeNode[]): BookmarkId[] {
   const ids: BookmarkId[] = []
@@ -135,7 +148,12 @@ export function filterByDomain(roots: readonly TreeNode[], domain: string): Tree
   return filterTree(roots, { matchBookmark: (b) => b.domain === domain })
 }
 
-function compareNodes(a: TreeNode, b: TreeNode, key: SortKey): number {
+export interface SortOptions {
+  /** Importance (0–10) for a bookmark; used only by the 'importance' key. */
+  importanceOf?: (bookmark: BookmarkNode) => number
+}
+
+function compareNodes(a: TreeNode, b: TreeNode, key: SortKey, options: SortOptions): number {
   // Folders always render above bookmarks regardless of key.
   if (a.type !== b.type) return a.type === 'folder' ? -1 : 1
   switch (key) {
@@ -148,6 +166,12 @@ function compareNodes(a: TreeNode, b: TreeNode, key: SortKey): number {
     }
     case 'recent':
       return (b.dateAdded ?? 0) - (a.dateAdded ?? 0)
+    case 'importance': {
+      if (a.type === 'folder') return a.index - b.index // both folders here
+      const ia = options.importanceOf?.(a) ?? -1
+      const ib = options.importanceOf?.(b as BookmarkNode) ?? -1
+      return ib - ia || a.title.localeCompare(b.title) // higher importance first
+    }
     case 'manual':
     default:
       return a.index - b.index
@@ -155,13 +179,15 @@ function compareNodes(a: TreeNode, b: TreeNode, key: SortKey): number {
 }
 
 /** Recursively sort children by the chosen key. Returns new nodes (immutable). */
-export function sortTree(roots: readonly TreeNode[], key: SortKey): TreeNode[] {
+export function sortTree(
+  roots: readonly TreeNode[],
+  key: SortKey,
+  options: SortOptions = {},
+): TreeNode[] {
   const sortNodes = (nodes: readonly TreeNode[]): TreeNode[] =>
     [...nodes]
-      .map((node) =>
-        isFolder(node) ? { ...node, children: sortNodes(node.children) } : node,
-      )
-      .sort((a, b) => compareNodes(a, b, key))
+      .map((node) => (isFolder(node) ? { ...node, children: sortNodes(node.children) } : node))
+      .sort((a, b) => compareNodes(a, b, key, options))
   return sortNodes(roots)
 }
 
