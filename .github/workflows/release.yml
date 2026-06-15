@@ -27,13 +27,16 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      # node 22.22.3 bundles npm 10.9.8, which crashes `npm ci` with
-      # "Exit handler never called!" on a clean install. Use a stable npm.
+      # node 22.x bundles npm 10.9.8, whose `npm ci` both crashes with
+      # "Exit handler never called!" and trips npm/cli#4828 (skips Rollup's
+      # platform-specific optional dep on Linux). Use a stable npm…
       - name: Use a stable npm
         run: npm install -g npm@11
 
+      # …and `npm install` (not `npm ci`) so the Linux Rollup binary
+      # (@rollup/rollup-linux-x64-gnu) resolves from the macOS-generated lockfile.
       - name: Install
-        run: npm ci
+        run: npm install
 
       - name: Typecheck
         run: npm run typecheck
