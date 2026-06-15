@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
-import { collectDomains, collectFolderIds, countTree } from '@/bookmarks/tree'
+import { collectBookmarkUrls, collectDomains, collectFolderIds, countTree } from '@/bookmarks/tree'
 import { isFolder, type TreeNode } from '@/bookmarks/types'
 import { selectVisibleRows } from '@/state/selectors'
+import { useMetadataStore } from '@/state/metadataStore'
 import { useUiStore } from '@/state/uiStore'
 import { Button } from '@/ui/components/Button'
 import { Icon } from '@/ui/components/Icon'
 import { BookmarkTreeView } from './components/BookmarkTreeView'
+import { MetadataBar } from './components/MetadataBar'
 import { SettingsPanel } from './components/SettingsPanel'
 import { Toolbar } from './components/Toolbar'
 import { useBookmarkTree } from './hooks/useBookmarkTree'
@@ -24,11 +26,15 @@ export function App() {
   const expandAll = useUiStore((s) => s.expandAll)
   const collapseAll = useUiStore((s) => s.collapseAll)
 
+  const metadataByUrl = useMetadataStore((s) => s.byUrl)
+  const loadMetadataFromCache = useMetadataStore((s) => s.loadFromCache)
+
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [didInit, setDidInit] = useState(false)
 
   const counts = useMemo(() => countTree(roots), [roots])
   const domains = useMemo(() => collectDomains(roots), [roots])
+  const allUrls = useMemo(() => collectBookmarkUrls(roots), [roots])
   const rows = useMemo(
     () => selectVisibleRows(roots, { searchQuery, domainFilter, sortKey, expandedIds }),
     [roots, searchQuery, domainFilter, sortKey, expandedIds],
@@ -37,6 +43,11 @@ export function App() {
     () => rows.reduce((n, row) => (row.node.type === 'bookmark' ? n + 1 : n), 0),
     [rows],
   )
+
+  // Hydrate any previously cached metadata once on mount.
+  useEffect(() => {
+    void loadMetadataFromCache()
+  }, [loadMetadataFromCache])
 
   // Open the top-level roots once so the user sees structure immediately.
   useEffect(() => {
@@ -74,6 +85,8 @@ export function App() {
         onRefresh={() => void refetch()}
       />
 
+      <MetadataBar allUrls={allUrls} />
+
       <main className="relative flex-1 overflow-hidden">
         {isLoading ? (
           <CenteredMessage>Loading bookmarks…</CenteredMessage>
@@ -93,6 +106,7 @@ export function App() {
         ) : (
           <BookmarkTreeView
             rows={rows}
+            metadataByUrl={metadataByUrl}
             onToggle={toggleExpanded}
             onOpen={(url) => window.open(url, '_blank', 'noopener')}
           />

@@ -8,8 +8,11 @@ export default defineManifest({
   name: 'LinkAtlas',
   version: pkg.version,
   description: pkg.description,
-  // Read & (later) reorganize bookmarks; persist settings + analysis cache.
+  // Read & (later) reorganize bookmarks; persist settings + metadata cache.
   permissions: ['bookmarks', 'storage'],
+  // Page fetching for metadata is opt-in: requested at runtime from a user
+  // gesture (the "Collect metadata" button), never granted up front.
+  optional_host_permissions: ['<all_urls>'],
   action: {
     default_popup: 'src/popup/index.html',
     default_title: 'LinkAtlas',

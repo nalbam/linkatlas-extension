@@ -59,6 +59,23 @@ export function collectDomains(roots: readonly TreeNode[]): string[] {
   return [...set].sort((a, b) => a.localeCompare(b))
 }
 
+/** Unique bookmark URLs across the tree (used to scope metadata collection). */
+export function collectBookmarkUrls(roots: readonly TreeNode[]): string[] {
+  const urls: string[] = []
+  const seen = new Set<string>()
+  const walk = (nodes: readonly TreeNode[]) => {
+    for (const node of nodes) {
+      if (isFolder(node)) walk(node.children)
+      else if (!seen.has(node.url)) {
+        seen.add(node.url)
+        urls.push(node.url)
+      }
+    }
+  }
+  walk(roots)
+  return urls
+}
+
 /** All folder ids in the tree — used to drive "expand all". */
 export function collectFolderIds(roots: readonly TreeNode[]): BookmarkId[] {
   const ids: BookmarkId[] = []

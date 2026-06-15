@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  collectBookmarkUrls,
   collectDomains,
   collectFolderIds,
   countTree,
@@ -64,6 +65,16 @@ describe('collectDomains', () => {
       'aws.amazon.com',
       'news.ycombinator.com',
       'react.dev',
+    ])
+  })
+})
+
+describe('collectBookmarkUrls', () => {
+  it('returns unique bookmark URLs across the tree', () => {
+    expect(collectBookmarkUrls(sampleTree())).toEqual([
+      'https://react.dev/learn',
+      'https://aws.amazon.com/console',
+      'https://news.ycombinator.com',
     ])
   })
 })

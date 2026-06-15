@@ -1,12 +1,14 @@
 import { useRef } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { type FlatNode } from '@/bookmarks/types'
+import { type BookmarkMetadata } from '@/metadata/types'
 import { TreeNodeRow } from '@/ui/components/TreeNodeRow'
 
 const ROW_HEIGHT = 34
 
 interface BookmarkTreeViewProps {
   rows: FlatNode[]
+  metadataByUrl: Record<string, BookmarkMetadata>
   onToggle: (id: string) => void
   onOpen: (url: string) => void
 }
@@ -16,7 +18,12 @@ interface BookmarkTreeViewProps {
  * overscan) are mounted, so 10k+ bookmarks stay smooth. Row identity is keyed
  * by node id so scroll position survives search/filter changes.
  */
-export function BookmarkTreeView({ rows, onToggle, onOpen }: BookmarkTreeViewProps) {
+export function BookmarkTreeView({
+  rows,
+  metadataByUrl,
+  onToggle,
+  onOpen,
+}: BookmarkTreeViewProps) {
   const parentRef = useRef<HTMLDivElement>(null)
   const virtualizer = useVirtualizer({
     count: rows.length,
@@ -31,21 +38,25 @@ export function BookmarkTreeView({ rows, onToggle, onOpen }: BookmarkTreeViewPro
       <div
         style={{ height: virtualizer.getTotalSize(), position: 'relative', width: '100%' }}
       >
-        {virtualizer.getVirtualItems().map((item) => (
-          <div
-            key={item.key}
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: ROW_HEIGHT,
-              transform: `translateY(${item.start}px)`,
-            }}
-          >
-            <TreeNodeRow row={rows[item.index]} onToggle={onToggle} onOpen={onOpen} />
-          </div>
-        ))}
+        {virtualizer.getVirtualItems().map((item) => {
+          const row = rows[item.index]
+          const metadata = row.node.type === 'bookmark' ? metadataByUrl[row.node.url] : undefined
+          return (
+            <div
+              key={item.key}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: ROW_HEIGHT,
+                transform: `translateY(${item.start}px)`,
+              }}
+            >
+              <TreeNodeRow row={row} metadata={metadata} onToggle={onToggle} onOpen={onOpen} />
+            </div>
+          )
+        })}
       </div>
     </div>
   )
