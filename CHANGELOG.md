@@ -4,6 +4,27 @@ All notable changes to LinkAtlas are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.3] — Tooling
+
+### Changed
+
+- Pin the npm registry via a root `.npmrc` and refine the release workflow.
+
+No application or feature changes — the 0.5.0 feature set remains current.
+
+## [0.5.2] — Tooling
+
+### Changed
+
+- Restore the committed `package-lock.json` for reproducible installs.
+
+## [0.5.1] — Tooling
+
+### Changed
+
+- Streamline the release workflow and `.gitignore` (the lockfile dropped here was
+  re-added in 0.5.2).
+
 ## [0.5.0] — Phase 5: Apply Changes to Chrome
 
 ### Added
@@ -142,6 +163,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   management, and apply-to-Chrome are scheduled for later phases (see ROADMAP).
 - 28 passing unit tests; `typecheck` and `build` are green.
 
+[0.5.3]: https://github.com/nalbam/linkatlas-extension/releases/tag/v0.5.3
+[0.5.2]: https://github.com/nalbam/linkatlas-extension/releases/tag/v0.5.2
+[0.5.1]: https://github.com/nalbam/linkatlas-extension/releases/tag/v0.5.1
 [0.5.0]: https://github.com/nalbam/linkatlas-extension/releases/tag/v0.5.0
 [0.4.0]: https://github.com/nalbam/linkatlas-extension/releases/tag/v0.4.0
 [0.3.0]: https://github.com/nalbam/linkatlas-extension/releases/tag/v0.3.0

@@ -88,9 +88,9 @@ explicit action.
   (incremental resume on re-run), but a chunked/resumable queue would be more
   robust for 5k+ jobs.
 - No icon assets yet (extension uses the default action icon).
-- Metadata uses background `fetch`, not content scripts, so `src/content/` stays
-  unused for now (would only be needed for in-page extraction of JS-rendered
-  pages).
+- Metadata uses background `fetch`, not content scripts, so there is no
+  `src/content/`; one would only be needed for in-page extraction of
+  JS-rendered pages.
 - Component-level tests (React Testing Library) deferred; current coverage is on
   pure logic. Add interaction tests when management/DnD (Phase 4) lands.
 - Editable working-tree store intentionally omitted until Phase 4 (would be
