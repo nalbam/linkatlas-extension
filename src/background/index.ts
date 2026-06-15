@@ -7,10 +7,13 @@
  */
 
 import { runAnalysisJob } from './analysisJob'
+import { runApplyJob, runRollbackJob } from './applyJob'
 import {
   ANALYSIS_PORT,
+  APPLY_PORT,
   METADATA_PORT,
   type AnalysisClientMessage,
+  type ApplyClientMessage,
   type ClientMessage,
 } from './messages'
 import { runMetadataJob } from './metadataJob'
@@ -23,6 +26,7 @@ chrome.runtime.onInstalled.addListener((details) => {
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name === METADATA_PORT) handleMetadataPort(port)
   else if (port.name === ANALYSIS_PORT) handleAnalysisPort(port)
+  else if (port.name === APPLY_PORT) handleApplyPort(port)
 })
 
 function handleMetadataPort(port: chrome.runtime.Port) {
@@ -62,6 +66,31 @@ function handleAnalysisPort(port: chrome.runtime.Port) {
       } catch (error) {
         safePost(port, { type: 'error', message: (error as Error).message })
       }
+    } else if (message.type === 'cancel') {
+      controller.abort()
+    }
+  })
+  port.onDisconnect.addListener(() => controller.abort())
+}
+
+function handleApplyPort(port: chrome.runtime.Port) {
+  const controller = new AbortController()
+  let started = false
+
+  port.onMessage.addListener((message: ApplyClientMessage) => {
+    if (message.type === 'apply') {
+      if (started) return
+      started = true
+      void runApplyJob(
+        message.assignments,
+        message.target,
+        (workerMessage) => safePost(port, workerMessage),
+        controller.signal,
+      )
+    } else if (message.type === 'rollback') {
+      if (started) return
+      started = true
+      void runRollbackJob((workerMessage) => safePost(port, workerMessage))
     } else if (message.type === 'cancel') {
       controller.abort()
     }

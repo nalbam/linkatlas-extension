@@ -20,6 +20,8 @@ export type IconName =
   | 'grid'
   | 'list'
   | 'merge'
+  | 'upload'
+  | 'check'
 
 // Stroke-based 24x24 paths, rendered at any size via the `size` prop.
 const PATHS: Record<IconName, string> = {
@@ -43,6 +45,8 @@ const PATHS: Record<IconName, string> = {
   grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
   list: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
   merge: 'M6 3v6a6 6 0 0 0 6 6h6M18 12l3 3-3 3',
+  upload: 'M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M12 3v12M8 7l4-4 4 4',
+  check: 'M5 12l5 5L20 7',
 }
 
 interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'name'> {

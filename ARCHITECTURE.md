@@ -13,16 +13,17 @@ State      state/ (Zustand stores) + selectors (pure) · utils/queryClient
 Services   services/ (framework-agnostic data access)
 Domain     bookmarks/ (model + tree utils) · metadata/ (parser/fetcher/cache)
            analysis/ (input/estimate/cache) · organize/ (reducers + grouping)
-           ai/ (abstraction + prompts)
-Adapters   chromeBookmarks · metadata/cache · analysis/cache · ai/providers/*
-           utils/chromeStorage · background jobs (metadata + analysis)
+           apply/ (planner + snapshot) · ai/ (abstraction + prompts)
+Adapters   chromeBookmarks · metadata/cache · analysis/cache · apply/snapshot
+           ai/providers/* · utils/chromeStorage
+           background jobs (metadata + analysis + apply/rollback)
 ```
 
 Dependencies point downward only. `bookmarks/tree.ts`, `state/selectors.ts`,
 `metadata/parseHtml.ts`, `utils/batch.ts`, `analysis/estimate.ts`,
-`analysis/analyzeInput.ts`, `organize/operations.ts`, and `ai/prompts.ts` import
-nothing from React or Chrome, which is what keeps them fast and trivially
-testable.
+`analysis/analyzeInput.ts`, `organize/operations.ts`, `apply/plan.ts`, and
+`ai/prompts.ts` import nothing from React or Chrome, which is what keeps them
+fast and trivially testable.
 
 ## Data Flow (read path)
 
@@ -93,7 +94,23 @@ pure reducers in `organize/operations.ts` (create / rename / merge / delete /
 move) — the store computes the affected URLs from the current grouping and calls
 the reducer, so the reducers stay membership-agnostic and testable. The store
 keeps an in-session undo history and persists only the current state. This
-working plan is the input to Phase 5 (diff + apply to Chrome).
+working plan is the input to the apply step.
+
+## Apply & Rollback (the only Chrome mutation)
+
+Applying the plan is the one place LinkAtlas writes to Chrome. `buildApplyPlan`
+turns the grouping into assignments (excluding Uncategorized + empty), shown in
+`ApplyDialog` as a preview. On confirm, `runApplyJob` (service worker) creates a
+container + per-category folders (`ensureFolder` reuses same-named ones) and
+moves each categorized bookmark in — **sequentially**, to avoid index races.
+
+Reversibility is built in: before each move the bookmark's original
+`{parentId, index}` is recorded to an `ApplySnapshot` (plus the ids of folders we
+created), persisted incrementally so even an interrupted apply is undoable.
+`runRollbackJob` moves bookmarks back (reverse order) and removes the created
+folders. Because bookmark ids are stable across moves and original folders are
+never deleted, rollback fully restores the prior arrangement. The snapshot is
+single-slot — rollback undoes the most recent apply.
 
 ## Key Decisions
 
@@ -139,15 +156,19 @@ working plan is the input to Phase 5 (diff + apply to Chrome).
 | `analysis/estimate.ts` | Token/cost estimate for the privacy gate (pure). |
 | `analysis/cache.ts` | `chrome.storage.local` analysis cache + freshness. |
 | `organize/operations.ts` | Pure category reducers + `groupByCategory` + `effectiveCategory`. |
+| `apply/plan.ts` | Pure `buildApplyPlan` (preview from grouping). |
+| `apply/snapshot.ts` | Single-slot rollback snapshot in storage. |
 | `utils/batch.ts` | Concurrency-limited batch runner (rate limit + progress + abort). |
-| `background/messages.ts` | Typed Port message contracts (metadata + analysis). |
+| `background/messages.ts` | Typed Port contracts (metadata + analysis + apply). |
 | `background/metadataJob.ts` | Fetch + cache + stream job. |
 | `background/analysisJob.ts` | Analyze + cache + stream job. |
+| `background/applyJob.ts` | Apply + rollback (create folders, move bookmarks, snapshot). |
 | `state/uiStore.ts` | Search / domain / category / tag / sort / expanded state. |
 | `state/settingsStore.ts` | Provider choice + API keys (persisted). |
 | `state/metadataStore.ts` | Collected metadata (`byUrl`) + job progress (Port client). |
 | `state/analysisStore.ts` | AI analysis (`byUrl`) + job progress (Port client). |
 | `state/organizeStore.ts` | Category working state + undo history (persisted). |
+| `state/applyStore.ts` | Apply/rollback job progress + summary + snapshot flag. |
 | `state/selectors.ts` | `selectVisibleRows` + `selectFilteredBookmarks`. |
 | `ai/types.ts` | `AIProvider`, `BookmarkAnalysis`, `AnalyzeInput`. |
 | `ai/prompts.ts` | System prompt, JSON schema, `normalizeAnalysis`, parsing. |
@@ -160,8 +181,8 @@ working plan is the input to Phase 5 (diff + apply to Chrome).
 
 Pure modules carry the test weight: `bookmarks/tree`, `state/selectors`,
 `metadata/parseHtml`, `metadata/fetchMetadata` (injected `fetch`), `utils/batch`,
-`analysis/analyzeInput`, `analysis/estimate`, `organize/operations`, `ai/prompts`,
-and `ai/providers/OpenAIProvider` (injected `fetch`). This covers
+`analysis/analyzeInput`, `analysis/estimate`, `organize/operations`, `apply/plan`,
+`ai/prompts`, and `ai/providers/OpenAIProvider` (injected `fetch`). This covers
 search/filter/sort/flatten, the derivation pipeline (including importance sort +
 category/tag filters), HTML extraction, fetch error/timeout/redirect handling,
 batch concurrency/abort, input building, usage estimation, category

@@ -4,6 +4,31 @@ All notable changes to LinkAtlas are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] — Phase 5: Apply Changes to Chrome
+
+### Added
+
+- **Apply to Chrome**: materialize the category working plan as real Chrome
+  bookmark folders — create a container ("LinkAtlas") under a chosen top-level
+  folder, one subfolder per category, and move categorized bookmarks in. Runs as
+  a background service-worker job with progress.
+- **Preview + confirm gate** (`ApplyDialog`): shows categories, folders to
+  create, bookmarks to move, and the target before anything changes; nothing is
+  applied until the user confirms.
+- **Post-apply summary** (folders created · bookmarks moved).
+- **Rollback**: every apply records an incremental snapshot (original
+  parent/index per moved bookmark + created folder ids); Rollback moves
+  bookmarks back and removes the created folders. Uncategorized bookmarks and
+  original folders are left untouched, so the undo is complete.
+- Pure, tested apply planner (`buildApplyPlan`) that excludes Uncategorized and
+  empty categories.
+
+### Notes
+
+- 62 passing unit tests; `typecheck` and `build` are green.
+- Apply is destructive (it moves real bookmarks) but reversible; the most recent
+  apply can be rolled back. No new permissions (uses the existing `bookmarks`).
+
 ## [0.4.0] — Phase 4: Category Management
 
 ### Added
@@ -117,6 +142,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   management, and apply-to-Chrome are scheduled for later phases (see ROADMAP).
 - 28 passing unit tests; `typecheck` and `build` are green.
 
+[0.5.0]: https://github.com/nalbam/linkatlas-extension/releases/tag/v0.5.0
 [0.4.0]: https://github.com/nalbam/linkatlas-extension/releases/tag/v0.4.0
 [0.3.0]: https://github.com/nalbam/linkatlas-extension/releases/tag/v0.3.0
 [0.2.0]: https://github.com/nalbam/linkatlas-extension/releases/tag/v0.2.0

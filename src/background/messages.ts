@@ -1,5 +1,6 @@
 import { type AnalyzeItem, type StoredAnalysis } from '@/analysis/types'
 import { type ProviderId } from '@/ai/types'
+import { type ApplyAssignment, type ApplySummary, type ApplyTarget } from '@/apply/types'
 import { type BookmarkMetadata } from '@/metadata/types'
 
 /**
@@ -30,4 +31,17 @@ export type AnalysisWorkerMessage =
   | { type: 'progress'; total: number; done: number }
   | { type: 'result'; analysis: StoredAnalysis }
   | { type: 'done'; total: number; ok: number; failed: number }
+  | { type: 'error'; message: string }
+
+export const APPLY_PORT = 'linkatlas-apply'
+
+export type ApplyClientMessage =
+  | { type: 'apply'; assignments: ApplyAssignment[]; target: ApplyTarget }
+  | { type: 'rollback' }
+  | { type: 'cancel' }
+
+export type ApplyWorkerMessage =
+  | { type: 'progress'; total: number; done: number }
+  | { type: 'done'; summary: ApplySummary }
+  | { type: 'rolledback'; restored: number }
   | { type: 'error'; message: string }

@@ -27,6 +27,11 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
+      # node 22.22.3 bundles npm 10.9.8, which crashes `npm ci` with
+      # "Exit handler never called!" on a clean install. Use a stable npm.
+      - name: Use a stable npm
+        run: npm install -g npm@11
+
       - name: Install
         run: npm ci
 

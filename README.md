@@ -6,11 +6,10 @@ Chrome bookmarks, visualizes them as a fast virtualized tree, and (in upcoming
 phases) uses pluggable LLM providers to summarize, categorize, tag, and
 reorganize them — all locally driven, with your API key, on your machine.
 
-> **Status — Phase 4 (category management).** Read, visualize, search, filter,
-> and sort your real bookmarks; collect per-page metadata; analyze with AI; and
-> reorganize bookmarks into categories (create / rename / merge / delete, drag &
-> drop, undo) in a local working plan. Applying that plan back to Chrome is the
-> final phase — see [ROADMAP.md](./ROADMAP.md).
+> **Status — MVP complete (Phase 5).** The full loop works end-to-end: read your
+> bookmarks → collect metadata → analyze with AI (categories, tags, importance) →
+> reorganize into categories → **preview** → **apply to Chrome** → **rollback**.
+> Remaining items are refinements — see [ROADMAP.md](./ROADMAP.md).
 
 ## Features
 
@@ -32,8 +31,11 @@ reorganize them — all locally driven, with your API key, on your machine.
   tag-statistics drawer.
 - **Category management** (Organize view) — reorganize bookmarks into categories
   with create / rename / merge / delete, drag-and-drop or multi-select move, and
-  undo. Edits a local working plan only; Chrome bookmarks stay untouched until
-  the apply phase.
+  undo. Edits a local working plan only.
+- **Apply to Chrome** — materialize the plan as real bookmark folders behind a
+  preview + confirm gate, with a post-apply summary and **one-click rollback**
+  (categorized bookmarks move into category folders; Uncategorized and original
+  folders are left untouched, so the undo is complete).
 - **Popup** with quick bookmark/folder counts and a one-click "Open Manager".
 - **Settings** for choosing an AI provider and storing its API key locally
   (`chrome.storage.local`).
@@ -82,15 +84,16 @@ src/
 ├─ options/      Full-page manager app (Tree + Organize views)
 │  ├─ components/  BookmarkTreeView, Toolbar, MetadataBar, AnalysisBar,
 │  │               AnalyzeDialog, TagStatsPanel, OrganizeView, CategorySection,
-│  │               SettingsPanel
+│  │               ApplyDialog, SettingsPanel
 │  └─ hooks/       useBookmarkTree, useDebouncedValue
 ├─ services/     Framework-agnostic data access (bookmarkService)
 ├─ ai/           Provider abstraction + OpenAI implementation + prompts
 ├─ analysis/     Pure analyze-input + token/cost estimate + cache + types
 ├─ organize/     Pure category reducers + grouping + types
+├─ apply/        Pure apply planner + snapshot + types
 ├─ bookmarks/    Domain model + Chrome adapter + pure tree utilities
 ├─ metadata/     Pure HTML parser + resilient fetcher + cache + types
-├─ state/        Zustand stores (ui, settings, metadata, analysis, organize)
+├─ state/        Zustand stores (ui, settings, metadata, analysis, organize, apply)
 ├─ ui/           Reusable presentational components
 └─ utils/        Query client, chrome.storage adapter, batch runner
 ```
