@@ -12,15 +12,17 @@ UI         ui/components · options/components + hooks
 State      state/ (Zustand stores) + selectors (pure) · utils/queryClient
 Services   services/ (framework-agnostic data access)
 Domain     bookmarks/ (model + tree utils) · metadata/ (parser/fetcher/cache)
-           analysis/ (input/estimate/cache) · ai/ (abstraction + prompts)
+           analysis/ (input/estimate/cache) · organize/ (reducers + grouping)
+           ai/ (abstraction + prompts)
 Adapters   chromeBookmarks · metadata/cache · analysis/cache · ai/providers/*
            utils/chromeStorage · background jobs (metadata + analysis)
 ```
 
 Dependencies point downward only. `bookmarks/tree.ts`, `state/selectors.ts`,
 `metadata/parseHtml.ts`, `utils/batch.ts`, `analysis/estimate.ts`,
-`analysis/analyzeInput.ts`, and `ai/prompts.ts` import nothing from React or
-Chrome, which is what keeps them fast and trivially testable.
+`analysis/analyzeInput.ts`, `organize/operations.ts`, and `ai/prompts.ts` import
+nothing from React or Chrome, which is what keeps them fast and trivially
+testable.
 
 ## Data Flow (read path)
 
@@ -82,6 +84,17 @@ store pattern), differing only in the worker (`provider.analyzeBookmark` instead
 of `fetchBookmarkMetadata`). The **scope** is the bookmarks matching the active
 filters (`selectFilteredBookmarks`), so filtering narrows what gets sent.
 
+## Category Management (working state)
+
+The Organize view edits a **working plan**, not Chrome. `organizeStore` holds an
+`OrganizeState = { overrides, extraCategories }`; a bookmark's category resolves
+`override → AI category → Uncategorized` (`effectiveCategory`). All mutations are
+pure reducers in `organize/operations.ts` (create / rename / merge / delete /
+move) — the store computes the affected URLs from the current grouping and calls
+the reducer, so the reducers stay membership-agnostic and testable. The store
+keeps an in-session undo history and persists only the current state. This
+working plan is the input to Phase 5 (diff + apply to Chrome).
+
 ## Key Decisions
 
 - **CRXJS + Vite** for MV3 bundling: the manifest (`src/manifest.config.ts`) is
@@ -125,6 +138,7 @@ filters (`selectFilteredBookmarks`), so filtering narrows what gets sent.
 | `analysis/analyzeInput.ts` | Build model input from bookmark + metadata (pure). |
 | `analysis/estimate.ts` | Token/cost estimate for the privacy gate (pure). |
 | `analysis/cache.ts` | `chrome.storage.local` analysis cache + freshness. |
+| `organize/operations.ts` | Pure category reducers + `groupByCategory` + `effectiveCategory`. |
 | `utils/batch.ts` | Concurrency-limited batch runner (rate limit + progress + abort). |
 | `background/messages.ts` | Typed Port message contracts (metadata + analysis). |
 | `background/metadataJob.ts` | Fetch + cache + stream job. |
@@ -133,6 +147,7 @@ filters (`selectFilteredBookmarks`), so filtering narrows what gets sent.
 | `state/settingsStore.ts` | Provider choice + API keys (persisted). |
 | `state/metadataStore.ts` | Collected metadata (`byUrl`) + job progress (Port client). |
 | `state/analysisStore.ts` | AI analysis (`byUrl`) + job progress (Port client). |
+| `state/organizeStore.ts` | Category working state + undo history (persisted). |
 | `state/selectors.ts` | `selectVisibleRows` + `selectFilteredBookmarks`. |
 | `ai/types.ts` | `AIProvider`, `BookmarkAnalysis`, `AnalyzeInput`. |
 | `ai/prompts.ts` | System prompt, JSON schema, `normalizeAnalysis`, parsing. |
@@ -145,10 +160,10 @@ filters (`selectFilteredBookmarks`), so filtering narrows what gets sent.
 
 Pure modules carry the test weight: `bookmarks/tree`, `state/selectors`,
 `metadata/parseHtml`, `metadata/fetchMetadata` (injected `fetch`), `utils/batch`,
-`analysis/analyzeInput`, `analysis/estimate`, `ai/prompts`, and
-`ai/providers/OpenAIProvider` (injected `fetch`). This covers
+`analysis/analyzeInput`, `analysis/estimate`, `organize/operations`, `ai/prompts`,
+and `ai/providers/OpenAIProvider` (injected `fetch`). This covers
 search/filter/sort/flatten, the derivation pipeline (including importance sort +
 category/tag filters), HTML extraction, fetch error/timeout/redirect handling,
-batch concurrency/abort, input building, usage estimation, response
-normalization, and the provider contract — all without a browser or network.
-Run with `npm test`.
+batch concurrency/abort, input building, usage estimation, category
+reducers/grouping, response normalization, and the provider contract — all
+without a browser or network. Run with `npm test`.

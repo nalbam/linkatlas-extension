@@ -1,12 +1,18 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { defineManifest } from '@crxjs/vite-plugin'
 import pkg from '../package.json'
+
+// VERSION (repo root) is the single source of truth for the released version;
+// the release workflow triggers on changes to it. See README "Releases".
+const version = readFileSync(fileURLToPath(new URL('../VERSION', import.meta.url)), 'utf8').trim()
 
 // Single source of truth for the MV3 manifest. CRXJS resolves the referenced
 // HTML / TS entry points and rewrites them to built asset paths.
 export default defineManifest({
   manifest_version: 3,
   name: 'LinkAtlas',
-  version: pkg.version,
+  version,
   description: pkg.description,
   // Read & (later) reorganize bookmarks; persist settings + metadata cache.
   permissions: ['bookmarks', 'storage'],

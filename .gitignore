@@ -1,6 +1,8 @@
 node_modules
 dist
 dist-zip
+target
+release
 *.local
 *.log
 .DS_Store

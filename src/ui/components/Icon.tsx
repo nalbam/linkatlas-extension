@@ -13,6 +13,13 @@ export type IconName =
   | 'refresh'
   | 'sparkle'
   | 'tag'
+  | 'plus'
+  | 'trash'
+  | 'edit'
+  | 'undo'
+  | 'grid'
+  | 'list'
+  | 'merge'
 
 // Stroke-based 24x24 paths, rendered at any size via the `size` prop.
 const PATHS: Record<IconName, string> = {
@@ -29,6 +36,13 @@ const PATHS: Record<IconName, string> = {
   refresh: 'M4 12a8 8 0 0 1 13.7-5.6L20 8M20 4v4h-4M20 12a8 8 0 0 1-13.7 5.6L4 16M4 20v-4h4',
   sparkle: 'M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z',
   tag: 'M3 12l8-8h7a2 2 0 0 1 2 2v7l-8 8a2 2 0 0 1-2.8 0L3 14.8a2 2 0 0 1 0-2.8zM16 8h.01',
+  plus: 'M12 5v14M5 12h14',
+  trash: 'M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13',
+  edit: 'M4 20h4L18 10l-4-4L4 16zM14 6l4 4',
+  undo: 'M9 14l-4-4 4-4M5 10h9a5 5 0 0 1 0 10h-4',
+  grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+  list: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
+  merge: 'M6 3v6a6 6 0 0 0 6 6h6M18 12l3 3-3 3',
 }
 
 interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'name'> {

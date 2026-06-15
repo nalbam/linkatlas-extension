@@ -14,10 +14,13 @@ import { AnalysisBar } from './components/AnalysisBar'
 import { AnalyzeDialog } from './components/AnalyzeDialog'
 import { BookmarkTreeView } from './components/BookmarkTreeView'
 import { MetadataBar } from './components/MetadataBar'
+import { OrganizeView } from './components/OrganizeView'
 import { SettingsPanel } from './components/SettingsPanel'
 import { TagStatsPanel } from './components/TagStatsPanel'
 import { Toolbar } from './components/Toolbar'
 import { useBookmarkTree } from './hooks/useBookmarkTree'
+
+type View = 'tree' | 'organize'
 
 const EMPTY_ROOTS: TreeNode[] = []
 
@@ -46,10 +49,13 @@ export function App() {
   const provider = useSettingsStore((s) => s.provider)
   const apiKey = useSettingsStore((s) => s.apiKeys[provider])
 
+  const [viewMode, setViewMode] = useState<View>('tree')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [analyzeOpen, setAnalyzeOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
   const [didInit, setDidInit] = useState(false)
+
+  const openUrl = (url: string) => window.open(url, '_blank', 'noopener')
 
   const view: ViewState = { searchQuery, domainFilter, categoryFilter, tagFilter, sortKey, expandedIds }
 
@@ -108,59 +114,75 @@ export function App() {
             </p>
           </div>
         </div>
-        <Button variant="default" onClick={() => setSettingsOpen(true)}>
-          <Icon name="settings" size={16} />
-          Settings
-        </Button>
+        <div className="flex items-center gap-2">
+          <ViewToggle view={viewMode} onChange={setViewMode} />
+          <Button variant="default" onClick={() => setSettingsOpen(true)}>
+            <Icon name="settings" size={16} />
+            Settings
+          </Button>
+        </div>
       </header>
 
-      <Toolbar
-        domains={domains}
-        categories={categories}
-        onExpandAll={() => expandAll(collectFolderIds(roots))}
-        onCollapseAll={collapseAll}
-        onRefresh={() => void refetch()}
-      />
-
-      <MetadataBar allUrls={allUrls} />
-
-      <AnalysisBar
-        pendingCount={analyzeItems.length}
-        statsOpen={statsOpen}
-        onAnalyze={() => setAnalyzeOpen(true)}
-        onToggleStats={() => setStatsOpen((open) => !open)}
-      />
-
-      <main className="relative flex-1 overflow-hidden">
-        {isLoading ? (
-          <CenteredMessage>Loading bookmarks…</CenteredMessage>
-        ) : isError ? (
-          <CenteredMessage>
-            <p className="text-rose-300">Failed to read bookmarks.</p>
-            <p className="mt-1 text-xs text-muted">{(error as Error)?.message}</p>
-            <Button className="mt-3" onClick={() => void refetch()}>
-              <Icon name="refresh" size={16} />
-              Retry
-            </Button>
-          </CenteredMessage>
-        ) : rows.length === 0 ? (
-          <CenteredMessage>
-            {counts.bookmarks === 0 ? 'No bookmarks found.' : 'No bookmarks match your filters.'}
-          </CenteredMessage>
-        ) : (
-          <BookmarkTreeView
-            rows={rows}
-            metadataByUrl={metadataByUrl}
-            analysisByUrl={analysisByUrl}
-            onToggle={toggleExpanded}
-            onOpen={(url) => window.open(url, '_blank', 'noopener')}
+      {viewMode === 'tree' ? (
+        <>
+          <Toolbar
+            domains={domains}
+            categories={categories}
+            onExpandAll={() => expandAll(collectFolderIds(roots))}
+            onCollapseAll={collapseAll}
+            onRefresh={() => void refetch()}
           />
-        )}
-      </main>
 
-      <footer className="border-t border-border px-4 py-1.5 text-xs text-muted">
-        {shownBookmarks.toLocaleString()} shown
-      </footer>
+          <MetadataBar allUrls={allUrls} />
+
+          <AnalysisBar
+            pendingCount={analyzeItems.length}
+            statsOpen={statsOpen}
+            onAnalyze={() => setAnalyzeOpen(true)}
+            onToggleStats={() => setStatsOpen((open) => !open)}
+          />
+
+          <main className="relative flex-1 overflow-hidden">
+            {isLoading ? (
+              <CenteredMessage>Loading bookmarks…</CenteredMessage>
+            ) : isError ? (
+              <CenteredMessage>
+                <p className="text-rose-300">Failed to read bookmarks.</p>
+                <p className="mt-1 text-xs text-muted">{(error as Error)?.message}</p>
+                <Button className="mt-3" onClick={() => void refetch()}>
+                  <Icon name="refresh" size={16} />
+                  Retry
+                </Button>
+              </CenteredMessage>
+            ) : rows.length === 0 ? (
+              <CenteredMessage>
+                {counts.bookmarks === 0 ? 'No bookmarks found.' : 'No bookmarks match your filters.'}
+              </CenteredMessage>
+            ) : (
+              <BookmarkTreeView
+                rows={rows}
+                metadataByUrl={metadataByUrl}
+                analysisByUrl={analysisByUrl}
+                onToggle={toggleExpanded}
+                onOpen={openUrl}
+              />
+            )}
+          </main>
+
+          <footer className="border-t border-border px-4 py-1.5 text-xs text-muted">
+            {shownBookmarks.toLocaleString()} shown
+          </footer>
+        </>
+      ) : (
+        <div className="min-h-0 flex-1">
+          <OrganizeView
+            roots={roots}
+            analysisByUrl={analysisByUrl}
+            metadataByUrl={metadataByUrl}
+            onOpen={openUrl}
+          />
+        </div>
+      )}
 
       <AnalyzeDialog
         open={analyzeOpen}
@@ -193,5 +215,44 @@ function CenteredMessage({ children }: { children: React.ReactNode }) {
     <div className="flex h-full flex-col items-center justify-center px-6 text-center text-sm text-muted">
       {children}
     </div>
+  )
+}
+
+function ViewToggle({ view, onChange }: { view: View; onChange: (view: View) => void }) {
+  return (
+    <div className="flex rounded-md border border-border bg-surface p-0.5">
+      <ToggleButton active={view === 'tree'} onClick={() => onChange('tree')} icon="list" label="Tree" />
+      <ToggleButton
+        active={view === 'organize'}
+        onClick={() => onChange('organize')}
+        icon="grid"
+        label="Organize"
+      />
+    </div>
+  )
+}
+
+function ToggleButton({
+  active,
+  onClick,
+  icon,
+  label,
+}: {
+  active: boolean
+  onClick: () => void
+  icon: 'list' | 'grid'
+  label: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-sm transition-colors ${
+        active ? 'bg-surface-raised text-slate-100' : 'text-muted hover:text-slate-100'
+      }`}
+    >
+      <Icon name={icon} size={15} />
+      {label}
+    </button>
   )
 }

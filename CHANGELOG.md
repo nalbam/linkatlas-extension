@@ -4,6 +4,29 @@ All notable changes to LinkAtlas are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] — Phase 4: Category Management
+
+### Added
+
+- **Organize view** (toggle in the header) that groups bookmarks by category —
+  a local working plan layered over AI categories, ready to apply to Chrome in a
+  later phase. Chrome is untouched until then.
+- Category operations as pure, tested reducers: **create**, **rename**, **merge**,
+  **delete** (reassigns to Uncategorized), and **move** bookmarks. "Split" is
+  create + move a selection.
+- **Native drag-and-drop** (zero dependencies) to move bookmarks between category
+  sections, plus checkbox multi-select with a "Move to…" action.
+- **Undo** for every category change (in-session history) and a created-category
+  list so empty categories persist.
+- `organizeStore` (Zustand) persists the working state to `chrome.storage.local`;
+  the effective category resolves override → AI category → Uncategorized.
+- Extracted a shared `Favicon` component (reused by the tree and organize rows).
+
+### Notes
+
+- 60 passing unit tests; `typecheck` and `build` are green.
+- The working state is the input for Phase 5 (preview + apply to Chrome).
+
 ## [0.3.0] — Phase 3: AI Analysis Flow
 
 ### Added
@@ -94,6 +117,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   management, and apply-to-Chrome are scheduled for later phases (see ROADMAP).
 - 28 passing unit tests; `typecheck` and `build` are green.
 
+[0.4.0]: https://github.com/nalbam/linkatlas-extension/releases/tag/v0.4.0
 [0.3.0]: https://github.com/nalbam/linkatlas-extension/releases/tag/v0.3.0
 [0.2.0]: https://github.com/nalbam/linkatlas-extension/releases/tag/v0.2.0
 [0.1.0]: https://github.com/nalbam/linkatlas-extension/releases/tag/v0.1.0

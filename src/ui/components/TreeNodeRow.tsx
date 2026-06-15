@@ -1,7 +1,7 @@
-import { useState } from 'react'
 import { type StoredAnalysis } from '@/analysis/types'
 import { type FlatNode } from '@/bookmarks/types'
 import { type BookmarkMetadata } from '@/metadata/types'
+import { Favicon } from './Favicon'
 import { Icon } from './Icon'
 
 const INDENT_PX = 16
@@ -97,28 +97,5 @@ function ImportanceBadge({ value }: { value: number }) {
     >
       {value}
     </span>
-  )
-}
-
-/** Favicon image with a graceful globe fallback on load error or when absent. */
-function Favicon({ src }: { src?: string }) {
-  const [failed, setFailed] = useState(false)
-  if (!src || failed) {
-    return (
-      <span className="shrink-0 text-sky-300/80">
-        <Icon name="globe" size={15} />
-      </span>
-    )
-  }
-  return (
-    <img
-      src={src}
-      alt=""
-      width={15}
-      height={15}
-      loading="lazy"
-      onError={() => setFailed(true)}
-      className="h-[15px] w-[15px] shrink-0 rounded-sm"
-    />
   )
 }

@@ -36,41 +36,43 @@ evaluated against the quality gates before the next begins.
       scope picker; "re-analyze" of already-analyzed bookmarks; per-bookmark
       detail view (summary, subcategory, reason).
 
-## Phase 4 — Category & Tag Management
+## Phase 4 — Category Management ✅ (current)
 
-- [ ] Editable working tree (new Zustand store) separate from the Chrome tree.
-- [ ] Rename / merge / split / create / delete categories.
-- [ ] Drag-and-drop move of bookmarks and folders.
-- [ ] Immediate local-state updates with undo.
+- [x] Editable working state (`organizeStore`) separate from the Chrome tree.
+- [x] Rename / merge / split / create / delete categories (pure, tested reducers).
+- [x] Drag-and-drop move of bookmarks (native HTML5) + multi-select "Move to".
+- [x] Immediate local-state updates with undo; persisted to storage.
+- [ ] Refinements: folder-level reorg, drag categories to merge, virtualized
+      organize rows for very large categories.
 
 ## Phase 5 — Apply Changes to Chrome
 
-- [ ] Diff working tree vs. Chrome; **preview** before applying.
-- [ ] Apply via Bookmarks API: create/rename/move/delete, reorganize hierarchy.
+- [ ] Diff working state vs. Chrome; **preview** before applying.
+- [ ] Apply via Bookmarks API: create category folders, move bookmarks,
+      delete empty folders.
 - [ ] Post-apply summary (moved / created / merged / deleted counts).
 - [ ] Rollback support (snapshot + restore).
 
-## Quality Gates — Phase 3 self-assessment
+## Quality Gates — Phase 4 self-assessment
 
-Scored for the cumulative deliverable through Phase 3. Target is ≥ 8; sub-8
+Scored for the cumulative deliverable through Phase 4. Target is ≥ 8; sub-8
 items carry an explicit action.
 
 | Dimension | Score | Notes |
 | --- | --- | --- |
-| Architecture | 9 | Two SW jobs share one Port/batch/cache/store pattern; provider abstraction now exercised end-to-end; pure cores throughout. |
-| UX | 8 | Importance/category overlays, tag stats, cost gate, progress/cancel. Per-bookmark detail view + model selector still pending. |
-| Performance | 8 | Virtualized rows; concurrency-limited jobs; throttled merges. Live 10k-node + large-job profiling still pending. |
-| Maintainability | 9 | Small focused modules (~3.0k LOC), 53 unit tests; analysis/metadata cores tested without browser/network. |
-| Security | 9 | Keys local-only; every host (`<all_urls>`, `api.openai.com`) is opt-in via user gesture; explicit cost/scope gate before any send; `credentials: 'omit'`. |
+| Architecture | 9 | Category management is pure reducers + a thin store; working state cleanly separated from Chrome; consistent patterns across phases. |
+| UX | 8 | Tree/Organize toggle, DnD + multi-select, undo, inline rename. Per-bookmark detail view + folder-level reorg still pending. |
+| Performance | 8 | Tree virtualized; organize rows are capped-height scroll (not virtualized) — fine for typical category sizes, see action. |
+| Maintainability | 9 | Small focused modules (~3.6k LOC), 60 unit tests; every core (tree/selectors/metadata/analysis/organize) tested without browser/network. |
+| Security | 9 | Keys local-only; all host access opt-in via user gesture; explicit cost/scope gate; working state is local-only until an explicit Phase 5 apply. |
 
 ### Actions to maintain/raise scores
 
-- **Perf:** profile with a 5k–10k synthetic set — scroll FPS, initial flatten,
-  and full metadata/analysis jobs; tune concurrency / flush interval if needed.
-- **UX:** per-bookmark detail panel (summary/subcategory/reason), a model +
-  custom-category selector in Settings, keyboard navigation.
-- **Coverage:** add Gemini/Claude providers (contract is ready) so the abstraction
-  is proven by more than one implementation.
+- **Perf:** virtualize organize rows when a category is large; profile a 5k–10k
+  synthetic set across tree/metadata/analysis/organize.
+- **UX:** per-bookmark detail panel, drag-categories-to-merge, keyboard nav.
+- **Coverage:** add Gemini/Claude providers (contract is ready) and component
+  interaction tests for the organize DnD flow.
 
 ## Technical Debt & TODOs
 
@@ -94,3 +96,7 @@ items carry an explicit action.
   from the UI without clearing storage.
 - Only the OpenAI provider is wired for analysis; Gemini/Claude are contract-ready
   but not implemented.
+- Organize rows are not virtualized; a single very large category renders all its
+  rows inside a scroll container.
+- Category management edits a working state only — it does not yet change Chrome
+  bookmarks (that is Phase 5).
