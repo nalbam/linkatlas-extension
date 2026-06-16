@@ -22,6 +22,7 @@ export type IconName =
   | 'merge'
   | 'upload'
   | 'check'
+  | 'alert'
 
 // Stroke-based 24x24 paths, rendered at any size via the `size` prop.
 const PATHS: Record<IconName, string> = {
@@ -47,6 +48,7 @@ const PATHS: Record<IconName, string> = {
   merge: 'M6 3v6a6 6 0 0 0 6 6h6M18 12l3 3-3 3',
   upload: 'M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M12 3v12M8 7l4-4 4 4',
   check: 'M5 12l5 5L20 7',
+  alert: 'M12 9v4M12 17h.01M10.3 4.4 2.4 18h19.2L13.7 4.4a2 2 0 0 0-3.4 0z',
 }
 
 interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'name'> {

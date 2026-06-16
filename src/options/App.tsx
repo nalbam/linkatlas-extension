@@ -14,6 +14,7 @@ import { Icon } from '@/ui/components/Icon'
 import { AnalysisBar } from './components/AnalysisBar'
 import { AnalyzeDialog } from './components/AnalyzeDialog'
 import { BookmarkTreeView } from './components/BookmarkTreeView'
+import { FailureLogView } from './components/FailureLogView'
 import { MetadataBar } from './components/MetadataBar'
 import { OrganizeView } from './components/OrganizeView'
 import { PipelineGuide } from './components/PipelineGuide'
@@ -166,7 +167,7 @@ export function App() {
 
       <PipelineGuide
         status={pipelineStatus}
-        viewMode={viewMode}
+        viewMode={viewMode === 'failures' ? 'tree' : viewMode}
         busy={anyJobRunning}
         onSwitchView={setViewMode}
       />
@@ -221,12 +222,20 @@ export function App() {
             {shownBookmarks.toLocaleString()} shown
           </footer>
         </>
-      ) : (
+      ) : viewMode === 'organize' ? (
         <div className="min-h-0 flex-1">
           <OrganizeView
             roots={roots}
             analysisByUrl={analysisByUrl}
             metadataByUrl={metadataByUrl}
+            onOpen={openUrl}
+          />
+        </div>
+      ) : (
+        <div className="min-h-0 flex-1">
+          <FailureLogView
+            metadataByUrl={metadataByUrl}
+            analysisByUrl={analysisByUrl}
             onOpen={openUrl}
           />
         </div>
@@ -277,6 +286,12 @@ function ViewToggle({ view, onChange }: { view: ViewMode; onChange: (view: ViewM
         icon="grid"
         label="Organize"
       />
+      <ToggleButton
+        active={view === 'failures'}
+        onClick={() => onChange('failures')}
+        icon="alert"
+        label="Failures"
+      />
     </div>
   )
 }
@@ -289,7 +304,7 @@ function ToggleButton({
 }: {
   active: boolean
   onClick: () => void
-  icon: 'list' | 'grid'
+  icon: 'list' | 'grid' | 'alert'
   label: string
 }) {
   return (

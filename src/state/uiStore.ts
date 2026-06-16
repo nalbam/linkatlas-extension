@@ -11,7 +11,7 @@ import { chromeStorageAdapter } from '@/utils/chromeStorage'
  * `chrome.storage.local` so it survives a reload; search/filter/sort stay
  * ephemeral.
  */
-export type ViewMode = 'tree' | 'organize'
+export type ViewMode = 'tree' | 'organize' | 'failures'
 
 interface UiState {
   searchQuery: string
