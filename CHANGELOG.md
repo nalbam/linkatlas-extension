@@ -43,7 +43,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   roots only when nothing was saved. Search/filter/sort stay ephemeral.
 - **AI recategorize (collection-aware).** A new "AI로 재정리" action sends the whole
   collection to the LLM in **one call** and groups similar sites into a small,
-  consistent set of categories (~10-15 top-level, a 2nd level only for large
+  consistent set of categories (~8–12 top-level, a 2nd level only for large
   groups) — fixing the per-bookmark analysis's inconsistent, over-split labels.
   The bookmark bar (manual-only) and purpose groups are excluded; results update each bookmark's AI
   category/subcategory (preserving summary/importance) and flow straight into the

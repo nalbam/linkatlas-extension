@@ -1,6 +1,6 @@
 {
   "name": "linkatlas-extension",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "AI-powered Chrome bookmark organizer",
   "type": "module",
   "private": true,

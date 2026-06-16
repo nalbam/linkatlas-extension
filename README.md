@@ -38,7 +38,7 @@ machine.
   (managed manually); results update each bookmark's category and flow into the
   organize tree. Failures are surfaced in the UI.
 - **Organize view** — edit the category tree directly. The browser roots
-  (북마크바 / 기타 북마크) show as read-only **大** nodes, with a **대/중/소** path
+  (북마크바 / 기타 북마크 / 모바일 북마크) show as read-only **大** nodes, with a **대/중/소** path
   hierarchy under each. **Purpose groups** (your own folders, e.g. a company or
   personal folder) are preserved as-is and skip AI classification; everything else
   is grouped by AI category. Drag bookmarks or folders (across roots too), rename /
@@ -47,7 +47,7 @@ machine.
   state persists across reloads. Edits a local working plan only.
 - **Apply to Chrome** — materialize the plan as real bookmark folders behind a
   preview + confirm gate: each bookmark's path is created under its assigned root
-  (북마크바 / 기타 북마크), reusing existing same-named folders. Post-apply summary +
+  (북마크바 / 기타 북마크 / 모바일 북마크), reusing existing same-named folders. Post-apply summary +
   **one-click rollback** that removes only the folders this apply created, so the
   undo is complete.
 - **Popup** with quick bookmark/folder counts and a one-click "Open Manager".

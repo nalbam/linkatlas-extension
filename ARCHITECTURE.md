@@ -88,7 +88,7 @@ filters (`selectFilteredBookmarks`), so filtering narrows what gets sent.
 ## Category Management (working state)
 
 The Organize view edits a **working plan**, not Chrome. A bookmark's placement is
-a **path** of 中/小 segments under a **大 root** (大 = bookmark bar / other —
+a **path** of 中/小 segments under a **大 root** (大 = bookmark bar / other / mobile —
 fixed by the browser). `organizeStore` holds `OrganizeState = { overrides,
 rootOverrides, extraPaths, purposeRoots }`; `effectivePath` resolves the path as
 `manual override → original folder path when its top folder is a purpose root

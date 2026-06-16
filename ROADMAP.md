@@ -60,7 +60,7 @@ evaluated against the quality gates before the next begins.
       categories; persisted state migrates v1/v2 → v3.
 - [x] **Purpose groups** — the user's own bookmark-bar folders are preserved as-is
       and skip AI classification; any top-level folder toggles purpose↔category.
-- [x] **大 (browser roots)** — 북마크바 / 기타 북마크 shown read-only at the top, with
+- [x] **大 (browser roots)** — 북마크바 / 기타 북마크 / 모바일 북마크 shown read-only at the top, with
       a 대/중/소 hierarchy under each. Bookmarks and folders move freely, across roots.
 - [x] **Collection-aware recategorize** — the whole collection goes to the LLM in
       one call → a small, consistent category hierarchy (~8–12 top-level, 2nd level
