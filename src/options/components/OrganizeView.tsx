@@ -65,7 +65,7 @@ function collectMoveTargets(forest: readonly RootTreeNode[]): MoveTarget[] {
 function placementsUnder(node: PathTreeNode, mapPath: (path: Path) => Path): Placement[] {
   const out: Placement[] = []
   const walk = (current: PathTreeNode) => {
-    for (const bookmark of current.bookmarks) out.push({ url: bookmark.url, path: mapPath(current.path) })
+    for (const bookmark of current.bookmarks) out.push({ id: bookmark.id, path: mapPath(current.path) })
     current.children.forEach(walk)
   }
   walk(node)
@@ -117,11 +117,13 @@ export function OrganizeView({ roots, analysisByUrl, metadataByUrl, onOpen }: Or
 
   const provider = useSettingsStore((s) => s.provider)
   const apiKey = useSettingsStore((s) => s.apiKeys[provider])
+  const providerReady = provider === 'openai'
   const startRecategorize = useAnalysisStore((s) => s.startRecategorize)
   const cancelAnalysis = useAnalysisStore((s) => s.cancel)
   const clearAnalysis = useAnalysisStore((s) => s.clearAll)
   const analysisJob = useAnalysisStore((s) => s.job)
   const analysisError = useAnalysisStore((s) => s.error)
+  const analysisWarnings = useAnalysisStore((s) => s.warnings)
 
   const bookmarks = useMemo(() => collectBookmarks(roots), [roots])
   const originalPathByUrl = useMemo(() => collectOriginalPaths(roots), [roots])
@@ -167,9 +169,9 @@ export function OrganizeView({ roots, analysisByUrl, metadataByUrl, onOpen }: Or
     ],
   )
   const recatEstimate = useMemo(() => estimateRecategorize(recat.inputs), [recat])
-  // URLs the user manually moved — their placement is pinned and AI recategorize
+  // Bookmark ids the user manually moved — their placement is pinned and AI recategorize
   // leaves them as-is (override beats AI in effectivePath), so we badge them.
-  const overrideUrls = useMemo(() => new Set(Object.keys(organize.overrides)), [organize.overrides])
+  const overrideIds = useMemo(() => new Set(Object.keys(organize.overrides)), [organize.overrides])
 
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [newName, setNewName] = useState('')
@@ -194,11 +196,11 @@ export function OrganizeView({ roots, analysisByUrl, metadataByUrl, onOpen }: Or
 
   const titleOf = (rootId: string) => rootsInfo.find((r) => r.rootId === rootId)?.title ?? ''
 
-  const toggleSelect = (url: string) =>
+  const toggleSelect = (id: string) =>
     setSelected((prev) => {
       const next = new Set(prev)
-      if (next.has(url)) next.delete(url)
-      else next.add(url)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
       return next
     })
 
@@ -217,8 +219,8 @@ export function OrganizeView({ roots, analysisByUrl, metadataByUrl, onOpen }: Or
     setMoveTargetKey('')
   }
 
-  const handleMoveUrls = (urls: string[], toRootId: string, toPath: Path) =>
-    moveBookmarksToRoot(urls, titleOf(toRootId), toPath)
+  const handleMoveIds = (ids: string[], toRootId: string, toPath: Path) =>
+    moveBookmarksToRoot(ids, titleOf(toRootId), toPath)
 
   const handleMoveFolder = (fromRootId: string, fromPath: Path, toRootId: string, toPath: Path) => {
     const node = findNode(tree, fromRootId, fromPath)
@@ -245,7 +247,7 @@ export function OrganizeView({ roots, analysisByUrl, metadataByUrl, onOpen }: Or
   }
 
   const handleRecategorize = async () => {
-    if (recat.inputs.length === 0 || !apiKey.trim() || analysisJob.running) return
+    if (recat.inputs.length === 0 || !apiKey.trim() || !providerReady || analysisJob.running) return
     const granted = await chrome.permissions.request({ origins: [HOST_BY_PROVIDER[provider]] })
     if (!granted) return
     startRecategorize({
@@ -298,6 +300,14 @@ export function OrganizeView({ roots, analysisByUrl, metadataByUrl, onOpen }: Or
         {analysisError && !analysisJob.running && (
           <span className="max-w-[40%] truncate text-xs text-rose-300" title={analysisError}>
             재정리 실패: {analysisError}
+          </span>
+        )}
+        {analysisWarnings.length > 0 && !analysisJob.running && (
+          <span
+            className="max-w-[40%] truncate text-xs text-amber-300"
+            title={analysisWarnings.join('\n')}
+          >
+            일부 재정리 실패: {analysisWarnings.length}개 chunk
           </span>
         )}
         <Button
@@ -362,10 +372,13 @@ export function OrganizeView({ roots, analysisByUrl, metadataByUrl, onOpen }: Or
                   className="w-16 rounded-md border border-border bg-surface px-2 py-1 text-slate-100 focus:border-accent focus:outline-none"
                 />
               </label>
+              {!providerReady && (
+                <span className="text-rose-300">현재 OpenAI만 지원합니다.</span>
+              )}
               {!apiKey.trim() && (
                 <span className="text-rose-300">설정에서 API 키를 입력하세요.</span>
               )}
-              <Button variant="primary" onClick={handleRecategorize} disabled={!apiKey.trim()}>
+              <Button variant="primary" onClick={handleRecategorize} disabled={!apiKey.trim() || !providerReady}>
                 실행
               </Button>
               <Button variant="ghost" onClick={() => setRecatOpen(false)}>
@@ -442,11 +455,11 @@ export function OrganizeView({ roots, analysisByUrl, metadataByUrl, onOpen }: Or
               root={root}
               moveTargets={moveTargets}
               metadataByUrl={metadataByUrl}
-              overrideUrls={overrideUrls}
-              selectedUrls={selected}
+              overrideIds={overrideIds}
+              selectedIds={selected}
               onToggleSelect={toggleSelect}
               onOpen={onOpen}
-              onMoveUrls={handleMoveUrls}
+              onMoveIds={handleMoveIds}
               onMoveFolder={handleMoveFolder}
               onRename={handleRename}
               onMerge={handleMerge}

@@ -4,6 +4,7 @@ import { Button } from '@/ui/components/Button'
 import { Icon } from '@/ui/components/Icon'
 
 const PROVIDERS: ProviderId[] = ['openai', 'gemini', 'claude']
+const IMPLEMENTED_PROVIDERS = new Set<ProviderId>(['openai'])
 
 interface SettingsPanelProps {
   open: boolean
@@ -39,12 +40,14 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                 <button
                   key={id}
                   type="button"
-                  onClick={() => setProvider(id)}
+                  onClick={() => IMPLEMENTED_PROVIDERS.has(id) && setProvider(id)}
+                  disabled={!IMPLEMENTED_PROVIDERS.has(id)}
+                  title={IMPLEMENTED_PROVIDERS.has(id) ? undefined : 'Not implemented yet'}
                   className={`rounded-md border px-2 py-1.5 text-sm transition-colors ${
                     provider === id
                       ? 'border-accent bg-accent/15 text-slate-100'
                       : 'border-border bg-surface-raised text-muted hover:text-slate-100'
-                  }`}
+                  } disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:text-muted`}
                 >
                   {PROVIDER_LABELS[id]}
                 </button>
@@ -77,8 +80,8 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
 
           <section className="rounded-md border border-border bg-surface-raised px-3 py-3">
             <p className="text-xs leading-relaxed text-muted">
-              AI analysis (summaries, categories, tags) arrives in an upcoming phase. Your key is
-              saved now so it's ready when you opt in to analyzing selected bookmarks.
+              OpenAI is currently implemented for analysis and AI recategorization. Other providers
+              are disabled until their adapters are added.
             </p>
           </section>
         </div>

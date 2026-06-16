@@ -111,7 +111,7 @@ describe('renamePath', () => {
       overrides: { u: ['6.Games', 'Diablo4'] },
       extraPaths: [['6.Games'], ['6.Games', 'Skyrim']],
     })
-    const affected: Placement[] = [{ url: 'u', path: ['Games', 'Diablo4'] }]
+    const affected: Placement[] = [{ id: 'u', path: ['Games', 'Diablo4'] }]
     const next = renamePath(st, ['6.Games'], ['Games'], affected)
     expect(next.overrides.u).toEqual(['Games', 'Diablo4'])
     expect(next.extraPaths).toEqual([['Games'], ['Games', 'Skyrim']])
@@ -126,8 +126,8 @@ describe('mergePaths', () => {
   it('rebases source extra paths into target and applies placements', () => {
     const st = state({ extraPaths: [['A'], ['B'], ['C']] })
     const affected: Placement[] = [
-      { url: 'u1', path: ['C'] },
-      { url: 'u2', path: ['C'] },
+      { id: 'u1', path: ['C'] },
+      { id: 'u2', path: ['C'] },
     ]
     const next = mergePaths(st, [['A'], ['B']], ['C'], affected)
     expect(next.overrides).toEqual({ u1: ['C'], u2: ['C'] })
@@ -138,7 +138,7 @@ describe('mergePaths', () => {
 describe('deletePath', () => {
   it('removes the path subtree and reassigns members', () => {
     const st = state({ extraPaths: [['Games'], ['Games', 'Diablo4'], ['Keep']] })
-    const affected: Placement[] = [{ url: 'u', path: [UNCATEGORIZED] }]
+    const affected: Placement[] = [{ id: 'u', path: [UNCATEGORIZED] }]
     const next = deletePath(st, ['Games'], affected)
     expect(next.extraPaths).toEqual([['Keep']])
     expect(next.overrides.u).toEqual([UNCATEGORIZED])
@@ -196,6 +196,15 @@ describe('buildRootTree', () => {
     expect(forest[1].children[0].segment).toBe('Misc')
   })
 
+  it('keeps duplicate URLs independent by bookmark id', () => {
+    const first = { ...bm('https://same'), id: 'a' }
+    const second = { ...bm('https://same'), id: 'b' }
+    const st = state({ rootOverrides: { b: 'Other' }, overrides: { b: ['Moved'] } })
+    const forest = buildRootTree([first, second], rootsInfo, { a: ['A'], b: ['B'] }, { a: 'Bar', b: 'Bar' }, {}, st)
+    expect(forest[0].children[0].segment).toBe('A')
+    expect(forest[1].children[0].segment).toBe('Moved')
+  })
+
   it('seeds empty extra paths under the first root only', () => {
     const st = state({ extraPaths: [['New']] })
     const forest = buildRootTree([], rootsInfo, {}, {}, {}, st)
@@ -218,7 +227,7 @@ describe('moveBookmarksToRoot', () => {
 describe('moveSubtreeToRoot', () => {
   it('moves placements to a new root and rebases extra paths', () => {
     const st = state({ extraPaths: [['Games'], ['Games', 'Diablo4']] })
-    const affected: RootPlacement[] = [{ url: 'u', path: ['Arcade', 'Diablo4'], rootTitle: 'Other' }]
+    const affected: RootPlacement[] = [{ id: 'u', path: ['Arcade', 'Diablo4'], rootTitle: 'Other' }]
     const next = moveSubtreeToRoot(st, ['Games'], 'Other', ['Arcade'], affected)
     expect(next.rootOverrides.u).toBe('Other')
     expect(next.overrides.u).toEqual(['Arcade', 'Diablo4'])

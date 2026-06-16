@@ -22,16 +22,16 @@ import { type OrganizeState, type PathTreeNode, type RootTreeNode } from './type
 export { UNCATEGORIZED }
 
 export const EMPTY_ORGANIZE: OrganizeState = {
-  version: 3,
+  version: 4,
   overrides: {},
   rootOverrides: {},
   extraPaths: [],
   purposeRoots: [],
 }
 
-/** An explicit url → path assignment used by the path-rewriting reducers. */
+/** An explicit bookmark id → path assignment used by the path-rewriting reducers. */
 export interface Placement {
-  url: string
+  id: string
   path: Path
 }
 
@@ -152,7 +152,7 @@ export function buildRootTree(
   const titleToId = new Map(rootsInfo.map((root) => [root.title, root.rootId]))
   const buckets = new Map<string, BookmarkNode[]>()
   for (const bookmark of bookmarks) {
-    const title = state.rootOverrides[bookmark.url] ?? originalRootByUrl[bookmark.url] ?? ''
+    const title = state.rootOverrides[bookmark.id] ?? originalRootByUrl[bookmark.id] ?? ''
     const rootId = titleToId.get(title) ?? rootsInfo[0]?.rootId ?? ''
     const list = buckets.get(rootId)
     if (list) list.push(bookmark)
@@ -174,10 +174,10 @@ function withPlacements(state: OrganizeState, placements: readonly Placement[]):
   if (placements.length === 0) return state
   const overrides = { ...state.overrides }
   let changed = false
-  for (const { url, path } of placements) {
+  for (const { id, path } of placements) {
     const clean = cleanPath(path)
     if (!clean.length) continue
-    overrides[url] = clean
+    overrides[id] = clean
     changed = true
   }
   return changed ? { ...state, overrides } : state
@@ -194,12 +194,12 @@ export function createPath(state: OrganizeState, path: Path): OrganizeState {
 /** Move bookmarks to a single target path (manual override). */
 export function moveBookmarks(
   state: OrganizeState,
-  urls: readonly string[],
+  ids: readonly string[],
   to: Path,
 ): OrganizeState {
   const target = cleanPath(to)
-  if (!target.length || urls.length === 0) return state
-  return withPlacements(state, urls.map((url) => ({ url, path: target })))
+  if (!target.length || ids.length === 0) return state
+  return withPlacements(state, ids.map((id) => ({ id, path: target })))
 }
 
 /**
@@ -286,11 +286,11 @@ function withRootPlacements(
   const overrides = { ...state.overrides }
   const rootOverrides = { ...state.rootOverrides }
   let changed = false
-  for (const { url, path, rootTitle } of placements) {
+  for (const { id, path, rootTitle } of placements) {
     const clean = cleanPath(path)
     if (!clean.length || !rootTitle) continue
-    overrides[url] = clean
-    rootOverrides[url] = rootTitle
+    overrides[id] = clean
+    rootOverrides[id] = rootTitle
     changed = true
   }
   return changed ? { ...state, overrides, rootOverrides } : state
@@ -299,15 +299,15 @@ function withRootPlacements(
 /** Move bookmarks to a single 大 root + path. */
 export function moveBookmarksToRoot(
   state: OrganizeState,
-  urls: readonly string[],
+  ids: readonly string[],
   toRootTitle: string,
   toPath: Path,
 ): OrganizeState {
   const path = cleanPath(toPath)
-  if (!path.length || !toRootTitle || urls.length === 0) return state
+  if (!path.length || !toRootTitle || ids.length === 0) return state
   return withRootPlacements(
     state,
-    urls.map((url) => ({ url, path, rootTitle: toRootTitle })),
+    ids.map((id) => ({ id, path, rootTitle: toRootTitle })),
   )
 }
 

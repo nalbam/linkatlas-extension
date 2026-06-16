@@ -33,8 +33,8 @@ export interface RecategorizeRequest {
  */
 export function buildRecategorizeInputs(
   bookmarks: readonly BookmarkNode[],
-  originalPathByUrl: Record<string, string[]>,
-  rootTitleByUrl: Record<string, string>,
+  originalPathById: Record<string, string[]>,
+  rootTitleById: Record<string, string>,
   purposeRoots: readonly string[],
   excludeRootTitles: readonly string[],
   metadataByUrl: MetadataMap,
@@ -44,8 +44,8 @@ export function buildRecategorizeInputs(
   const inputs: RecategorizeInput[] = []
   const urlByIndex: string[] = []
   for (const bookmark of bookmarks) {
-    if (excludedRoots.has(rootTitleByUrl[bookmark.url] ?? '')) continue
-    const original = originalPathByUrl[bookmark.url] ?? []
+    if (excludedRoots.has(rootTitleById[bookmark.id] ?? '')) continue
+    const original = originalPathById[bookmark.id] ?? []
     if (original.length > 0 && purposeRoots.includes(original[0])) continue
     const meta = metadataByUrl[bookmark.url]
     const hintRaw = meta?.description ?? meta?.ogDescription

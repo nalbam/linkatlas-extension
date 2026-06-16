@@ -57,6 +57,21 @@ describe('buildRecategorizeInputs', () => {
     expect(req.urlByIndex).toEqual(['https://other'])
   })
 
+  it('uses bookmark id for root/path eligibility so duplicate URLs stay independent', () => {
+    const barItem = { ...bm('https://same', 'Bar item', 'same.com'), id: 'a' }
+    const otherItem = { ...bm('https://same', 'Other item', 'same.com'), id: 'b' }
+    const req = buildRecategorizeInputs(
+      [barItem, otherItem],
+      { a: [], b: ['Dev'] },
+      { a: 'Bookmarks Bar', b: 'Other Bookmarks' },
+      [],
+      ['Bookmarks Bar'],
+      {},
+    )
+    expect(req.urlByIndex).toEqual(['https://same'])
+    expect(req.inputs).toEqual([{ title: 'Other item', domain: 'same.com', hint: undefined }])
+  })
+
   it('adds a trimmed metadata hint capped at 100 chars', () => {
     const b = bm('https://x', 'X', 'x.com')
     const req = buildRecategorizeInputs([b], {}, {}, [], [], {

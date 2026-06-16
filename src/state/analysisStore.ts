@@ -30,6 +30,7 @@ interface AnalysisState {
   byUrl: Record<string, StoredAnalysis>
   job: JobState
   error: string | null
+  warnings: string[]
   loadFromCache: () => Promise<void>
   startAnalysis: (args: StartArgs) => void
   startRecategorize: (args: StartRecategorizeArgs) => void
@@ -50,7 +51,7 @@ let connection: JobConnection | null = null
  */
 export const useAnalysisStore = create<AnalysisState>((set, get) => {
   const connect = (request: AnalysisClientMessage, initial: JobState) => {
-    set({ job: initial, error: null })
+    set({ job: initial, error: null, warnings: [] })
     connection = connectJob<AnalysisWorkerMessage>({
       portName: ANALYSIS_PORT,
       request,
@@ -68,12 +69,14 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => {
         if (message.type === 'progress') {
           set((state) => ({ job: { ...state.job, total: message.total, done: message.done } }))
         } else if (message.type === 'done') {
+          const warnings = message.errors ?? []
           set((state) => ({
             job: { ...state.job, running: false, done: message.total, ok: message.ok, failed: message.failed },
             error:
               message.ok === 0 && message.total > 0
                 ? '0 results — the model returned no usable assignments.'
                 : null,
+            warnings,
           }))
         } else if (message.type === 'error') {
           set((state) => ({ job: { ...state.job, running: false }, error: message.message }))
@@ -99,6 +102,7 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => {
     byUrl: {},
     job: IDLE_JOB,
     error: null,
+    warnings: [],
 
     loadFromCache: async () => {
       set({ byUrl: await getAllCachedAnalysis() })
@@ -128,7 +132,7 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => {
     },
 
     clearAll: () => {
-      set({ byUrl: {} })
+      set({ byUrl: {}, warnings: [], error: null })
       void clearAllCachedAnalysis()
     },
 

@@ -22,8 +22,8 @@ interface OrganizeStore {
   hasHydrated: boolean
 
   createPath: (path: Path) => void
-  moveBookmarks: (urls: string[], to: Path) => void
-  moveBookmarksToRoot: (urls: string[], toRootTitle: string, toPath: Path) => void
+  moveBookmarks: (ids: string[], to: Path) => void
+  moveBookmarksToRoot: (ids: string[], toRootTitle: string, toPath: Path) => void
   moveSubtreeToRoot: (from: Path, toRootTitle: string, toPath: Path, affected: ops.RootPlacement[]) => void
   renamePath: (from: Path, to: Path, affected: ops.Placement[]) => void
   mergePaths: (sources: Path[], to: Path, affected: ops.Placement[]) => void
@@ -51,9 +51,9 @@ export const useOrganizeStore = create<OrganizeStore>()(
         hasHydrated: false,
 
         createPath: (path) => apply((s) => ops.createPath(s, path)),
-        moveBookmarks: (urls, to) => apply((s) => ops.moveBookmarks(s, urls, to)),
-        moveBookmarksToRoot: (urls, toRootTitle, toPath) =>
-          apply((s) => ops.moveBookmarksToRoot(s, urls, toRootTitle, toPath)),
+        moveBookmarks: (ids, to) => apply((s) => ops.moveBookmarks(s, ids, to)),
+        moveBookmarksToRoot: (ids, toRootTitle, toPath) =>
+          apply((s) => ops.moveBookmarksToRoot(s, ids, toRootTitle, toPath)),
         moveSubtreeToRoot: (from, toRootTitle, toPath, affected) =>
           apply((s) => ops.moveSubtreeToRoot(s, from, toRootTitle, toPath, affected)),
         renamePath: (from, to, affected) => apply((s) => ops.renamePath(s, from, to, affected)),
@@ -79,7 +79,7 @@ export const useOrganizeStore = create<OrganizeStore>()(
     },
     {
       name: 'linkatlas-organize',
-      version: 3,
+      version: 4,
       storage: createJSONStorage(() => chromeStorageAdapter),
       migrate: (persisted) => {
         const prev = persisted as { organize?: unknown } | undefined

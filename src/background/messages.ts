@@ -41,7 +41,7 @@ export type AnalysisClientMessage =
 export type AnalysisWorkerMessage =
   | { type: 'progress'; total: number; done: number }
   | { type: 'result'; analysis: StoredAnalysis }
-  | { type: 'done'; total: number; ok: number; failed: number }
+  | { type: 'done'; total: number; ok: number; failed: number; errors?: string[] }
   | { type: 'error'; message: string }
 
 export const APPLY_PORT = 'linkatlas-apply'

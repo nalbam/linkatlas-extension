@@ -30,6 +30,7 @@ export async function runRecategorizeJob(
   const chunks = chunkRecategorizeInputs(inputs, RECATEGORIZE_CHUNK_SIZE)
   const covered: number[] = []
   const pending: StoredAnalysis[] = []
+  const errors: string[] = []
 
   // Running taxonomy: labels chosen by earlier chunks, fed to later ones so the
   // model reuses them instead of inventing parallel categories per chunk.
@@ -75,6 +76,9 @@ export async function runRecategorizeJob(
         await flush()
       } catch (error) {
         if (signal.aborted) break
+        const from = chunk.offset + 1
+        const to = chunk.offset + chunk.inputs.length
+        errors.push(`${from}-${to}: ${(error as Error).message}`)
         // This chunk failed — leave its inputs unassigned (counted as failed) and continue.
       }
       done += chunk.inputs.length
@@ -83,7 +87,7 @@ export async function runRecategorizeJob(
 
     await flush()
     const failed = findMissingIndices(covered, total).length
-    post({ type: 'done', total, ok: covered.length, failed })
+    post({ type: 'done', total, ok: covered.length, failed, errors: errors.length ? errors : undefined })
   } catch (error) {
     await flush()
     post({ type: 'error', message: (error as Error).message })

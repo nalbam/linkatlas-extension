@@ -54,13 +54,13 @@ export function effectivePath(
   analysisByUrl: AnalysisMap,
   state: PathState,
 ): { path: Path; origin: PathOrigin } {
-  const override = state.overrides[bookmark.url]
+  const override = state.overrides[bookmark.id]
   if (override) {
     const isPurpose = override.length > 0 && state.purposeRoots.includes(override[0])
     return { path: override, origin: isPurpose ? 'purpose' : 'category' }
   }
 
-  const original = originalPathByUrl[bookmark.url] ?? []
+  const original = originalPathByUrl[bookmark.id] ?? []
   if (original.length > 0 && state.purposeRoots.includes(original[0])) {
     return { path: original, origin: 'purpose' }
   }

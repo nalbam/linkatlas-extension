@@ -158,12 +158,22 @@ describe('flattenVisible', () => {
 })
 
 describe('collectOriginalPaths', () => {
-  it('maps each bookmark to its ancestor folders below the root', () => {
+  it('maps each bookmark id to its ancestor folders below the root', () => {
     expect(collectOriginalPaths(sampleTree())).toEqual({
-      'https://react.dev/learn': ['Dev'],
-      'https://aws.amazon.com/console': ['Dev'],
-      'https://news.ycombinator.com': [],
+      b1: ['Dev'],
+      b2: ['Dev'],
+      b3: [],
     })
+  })
+
+  it('keeps duplicate URLs independent by bookmark id', () => {
+    const tree = [
+      folder('bar', 'Bookmarks Bar', [
+        folder('work', 'Work', [bookmark('a', 'Same', 'https://same.test')]),
+        folder('personal', 'Personal', [bookmark('b', 'Same', 'https://same.test')]),
+      ]),
+    ]
+    expect(collectOriginalPaths(tree)).toEqual({ a: ['Work'], b: ['Personal'] })
   })
 })
 
@@ -177,11 +187,11 @@ describe('topLevelFolderTitles', () => {
 })
 
 describe('collectRootTitleByUrl', () => {
-  it('maps each bookmark to its top-level root title', () => {
+  it('maps each bookmark id to its top-level root title', () => {
     expect(collectRootTitleByUrl(sampleTree())).toEqual({
-      'https://react.dev/learn': 'Bookmarks Bar',
-      'https://aws.amazon.com/console': 'Bookmarks Bar',
-      'https://news.ycombinator.com': 'Bookmarks Bar',
+      b1: 'Bookmarks Bar',
+      b2: 'Bookmarks Bar',
+      b3: 'Bookmarks Bar',
     })
   })
 })

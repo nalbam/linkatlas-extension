@@ -7,7 +7,7 @@ import { Button } from '@/ui/components/Button'
 import { Favicon } from '@/ui/components/Favicon'
 import { Icon } from '@/ui/components/Icon'
 
-export const DRAG_MIME = 'application/x-linkatlas-urls'
+export const DRAG_MIME = 'application/x-linkatlas-bookmark-ids'
 
 /** A move/merge destination carrying BOTH the 大 root and the 中/小 path. */
 export interface MoveTarget {
@@ -17,10 +17,10 @@ export interface MoveTarget {
   path: Path
 }
 
-/** Drag payload — bookmarks (url list) or a folder subtree (source 大 + path). */
+/** Drag payload — bookmarks (id list) or a folder subtree (source 大 + path). */
 export interface DragPayload {
   kind: 'bookmarks' | 'folder'
-  urls?: string[]
+  ids?: string[]
   fromRootId?: string
   fromPath?: Path
 }
@@ -31,11 +31,11 @@ interface PathNodeSectionProps {
   depth: number
   moveTargets: MoveTarget[]
   metadataByUrl: Record<string, BookmarkMetadata>
-  overrideUrls: Set<string>
-  selectedUrls: Set<string>
-  onToggleSelect: (url: string) => void
+  overrideIds: Set<string>
+  selectedIds: Set<string>
+  onToggleSelect: (id: string) => void
   onOpen: (url: string) => void
-  onMoveUrls: (urls: string[], toRootId: string, toPath: Path) => void
+  onMoveIds: (ids: string[], toRootId: string, toPath: Path) => void
   onMoveFolder: (fromRootId: string, fromPath: Path, toRootId: string, toPath: Path) => void
   onRename: (node: PathTreeNode, draft: string) => void
   onMerge: (node: PathTreeNode, into: Path) => void
@@ -63,11 +63,11 @@ export function PathNodeSection({
   depth,
   moveTargets,
   metadataByUrl,
-  overrideUrls,
-  selectedUrls,
+  overrideIds,
+  selectedIds,
   onToggleSelect,
   onOpen,
-  onMoveUrls,
+  onMoveIds,
   onMoveFolder,
   onRename,
   onMerge,
@@ -99,14 +99,14 @@ export function PathNodeSection({
       // Reject dropping a folder onto itself or its own descendant in the same 大.
       if (payload.fromRootId === rootId && hasPrefix(node.path, payload.fromPath)) return
       onMoveFolder(payload.fromRootId, payload.fromPath, rootId, node.path)
-    } else if (payload.urls) {
-      onMoveUrls(payload.urls, rootId, node.path)
+    } else if (payload.ids) {
+      onMoveIds(payload.ids, rootId, node.path)
     }
   }
 
-  const startBookmarkDrag = (event: DragEvent, url: string) => {
-    const urls = selectedUrls.has(url) && selectedUrls.size > 0 ? [...selectedUrls] : [url]
-    const payload: DragPayload = { kind: 'bookmarks', urls }
+  const startBookmarkDrag = (event: DragEvent, id: string) => {
+    const ids = selectedIds.has(id) && selectedIds.size > 0 ? [...selectedIds] : [id]
+    const payload: DragPayload = { kind: 'bookmarks', ids }
     event.dataTransfer.setData(DRAG_MIME, JSON.stringify(payload))
     event.dataTransfer.effectAllowed = 'move'
   }
@@ -231,18 +231,18 @@ export function PathNodeSection({
           {node.bookmarks.length > 0 && (
             <ul className="max-h-80 overflow-auto">
               {node.bookmarks.map((bookmark) => {
-                const selected = selectedUrls.has(bookmark.url)
+                const selected = selectedIds.has(bookmark.id)
                 return (
                   <li
                     key={bookmark.id}
                     draggable
-                    onDragStart={(event) => startBookmarkDrag(event, bookmark.url)}
+                    onDragStart={(event) => startBookmarkDrag(event, bookmark.id)}
                     className={`flex items-center gap-2 px-3 py-1.5 ${selected ? 'bg-accent/10' : 'hover:bg-surface-raised'}`}
                   >
                     <input
                       type="checkbox"
                       checked={selected}
-                      onChange={() => onToggleSelect(bookmark.url)}
+                      onChange={() => onToggleSelect(bookmark.id)}
                       className="shrink-0 accent-accent"
                     />
                     <Favicon src={metadataByUrl[bookmark.url]?.faviconUrl} />
@@ -254,7 +254,7 @@ export function PathNodeSection({
                     >
                       {bookmark.title || bookmark.url}
                     </button>
-                    {overrideUrls.has(bookmark.url) && (
+                    {overrideIds.has(bookmark.id) && (
                       <span
                         className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-300"
                         title="수동으로 이동됨 — AI 재정리에서 유지됩니다"
@@ -283,11 +283,11 @@ export function PathNodeSection({
                   depth={depth + 1}
                   moveTargets={moveTargets}
                   metadataByUrl={metadataByUrl}
-                  overrideUrls={overrideUrls}
-                  selectedUrls={selectedUrls}
+                  overrideIds={overrideIds}
+                  selectedIds={selectedIds}
                   onToggleSelect={onToggleSelect}
                   onOpen={onOpen}
-                  onMoveUrls={onMoveUrls}
+                  onMoveIds={onMoveIds}
                   onMoveFolder={onMoveFolder}
                   onRename={onRename}
                   onMerge={onMerge}

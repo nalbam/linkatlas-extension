@@ -10,11 +10,11 @@ interface RootSectionProps {
   root: RootTreeNode
   moveTargets: MoveTarget[]
   metadataByUrl: Record<string, BookmarkMetadata>
-  overrideUrls: Set<string>
-  selectedUrls: Set<string>
-  onToggleSelect: (url: string) => void
+  overrideIds: Set<string>
+  selectedIds: Set<string>
+  onToggleSelect: (id: string) => void
   onOpen: (url: string) => void
-  onMoveUrls: (urls: string[], toRootId: string, toPath: Path) => void
+  onMoveIds: (ids: string[], toRootId: string, toPath: Path) => void
   onMoveFolder: (fromRootId: string, fromPath: Path, toRootId: string, toPath: Path) => void
   onRename: (node: PathTreeNode, draft: string) => void
   onMerge: (node: PathTreeNode, into: Path) => void
@@ -32,11 +32,11 @@ export function RootSection({
   root,
   moveTargets,
   metadataByUrl,
-  overrideUrls,
-  selectedUrls,
+  overrideIds,
+  selectedIds,
   onToggleSelect,
   onOpen,
-  onMoveUrls,
+  onMoveIds,
   onMoveFolder,
   onRename,
   onMerge,
@@ -105,11 +105,11 @@ export function RootSection({
                 depth={0}
                 moveTargets={moveTargets}
                 metadataByUrl={metadataByUrl}
-                overrideUrls={overrideUrls}
-                selectedUrls={selectedUrls}
+                overrideIds={overrideIds}
+                selectedIds={selectedIds}
                 onToggleSelect={onToggleSelect}
                 onOpen={onOpen}
-                onMoveUrls={onMoveUrls}
+                onMoveIds={onMoveIds}
                 onMoveFolder={onMoveFolder}
                 onRename={onRename}
                 onMerge={onMerge}

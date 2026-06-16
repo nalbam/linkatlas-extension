@@ -105,18 +105,17 @@ export function collectFolderIds(roots: readonly TreeNode[]): BookmarkId[] {
 }
 
 /**
- * Map each bookmark url to its ancestor folder titles *below* the 大 root —
+ * Map each bookmark id to its ancestor folder titles *below* the 大 root —
  * the root's own title is excluded, so a bookmark at `bookmark_bar/karrot/pay/x`
- * yields `['karrot','pay']` and a loose `bookmark_bar/x` yields `[]`. First
- * occurrence wins (matches {@link collectBookmarkUrls}). Used to preserve the
- * user's existing purpose folders when organizing.
+ * yields `['karrot','pay']` and a loose `bookmark_bar/x` yields `[]`. Keying by
+ * id keeps duplicate URLs in different folders independent.
  */
 export function collectOriginalPaths(roots: readonly TreeNode[]): Record<string, string[]> {
   const out: Record<string, string[]> = {}
   const walk = (nodes: readonly TreeNode[], trail: string[]) => {
     for (const node of nodes) {
       if (isFolder(node)) walk(node.children, [...trail, node.title])
-      else if (!(node.url in out)) out[node.url] = trail
+      else out[node.id] = trail
     }
   }
   for (const root of roots) {
@@ -132,9 +131,9 @@ export function topLevelFolderTitles(root: TreeNode | undefined): string[] {
 }
 
 /**
- * Map each bookmark url to its top-level 大 root title (the root it lives under).
- * First occurrence wins. Pairs with {@link collectOriginalPaths} (which excludes
- * the 大) so organize can render and apply per browser root.
+ * Map each bookmark id to its top-level 大 root title (the root it lives under).
+ * Pairs with {@link collectOriginalPaths} (which excludes the 大) so organize can
+ * render and apply per browser root without merging duplicate URLs.
  */
 export function collectRootTitleByUrl(roots: readonly TreeNode[]): Record<string, string> {
   const out: Record<string, string> = {}
@@ -143,7 +142,7 @@ export function collectRootTitleByUrl(roots: readonly TreeNode[]): Record<string
     const walk = (nodes: readonly TreeNode[]) => {
       for (const node of nodes) {
         if (isFolder(node)) walk(node.children)
-        else if (!(node.url in out)) out[node.url] = root.title
+        else out[node.id] = root.title
       }
     }
     walk(root.children)

@@ -81,6 +81,21 @@ describe('effectivePath', () => {
     expect(r).toEqual({ path: ['Manual', 'Deep'], origin: 'category' })
   })
 
+  it('keys manual overrides by bookmark id, not URL', () => {
+    const first = { ...bookmark('https://same.test'), id: 'a' }
+    const second = { ...bookmark('https://same.test'), id: 'b' }
+    const state = { overrides: { a: ['Manual'] }, purposeRoots: [] }
+
+    expect(effectivePath(first, { a: ['OrigA'], b: ['OrigB'] }, {}, state)).toEqual({
+      path: ['Manual'],
+      origin: 'category',
+    })
+    expect(effectivePath(second, { a: ['OrigA'], b: ['OrigB'] }, {}, state)).toEqual({
+      path: ['OrigB'],
+      origin: 'category',
+    })
+  })
+
   it('tags an override under a purpose root as purpose', () => {
     const r = effectivePath(b, {}, {}, {
       overrides: { [b.url]: ['karrot', 'pay'] },

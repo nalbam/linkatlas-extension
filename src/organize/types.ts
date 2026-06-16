@@ -5,7 +5,7 @@ import { type Path, type PathOrigin } from './path'
  * The editable organization layered over the original tree + AI categories.
  * This is a working plan — Chrome is untouched until apply.
  *
- * - `overrides`: url → explicit path (manual moves; win over original + AI).
+ * - `overrides`: bookmark id → explicit path (manual moves; win over original + AI).
  * - `extraPaths`: user-created paths that may have no members yet (so empty
  *   folders still render).
  * - `purposeRoots`: top segments treated as PURPOSE groups — their original
@@ -13,9 +13,9 @@ import { type Path, type PathOrigin } from './path'
  *   bookmark bar's top-level folders, then user-adjustable.
  */
 export interface OrganizeState {
-  version: 3
+  version: 4
   overrides: Record<string, Path>
-  /** url → 大 root title (absent ⇒ the bookmark's original root). */
+  /** bookmark id → 大 root title (absent ⇒ the bookmark's original root). */
   rootOverrides: Record<string, string>
   extraPaths: Path[]
   purposeRoots: string[]
