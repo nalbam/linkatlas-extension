@@ -42,6 +42,24 @@ describe('OpenAIProvider', () => {
     expect(payload.messages[0].role).toBe('system')
   })
 
+  it('caps output with max_tokens and forwards the abort signal', async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async () =>
+      jsonResponse({ choices: [{ message: { content: analysisJson } }] }),
+    )
+    const provider = new OpenAIProvider('sk-test', { fetchImpl })
+    const controller = new AbortController()
+
+    await provider.analyzeBookmark(
+      { title: 'React', url: 'https://react.dev', domain: 'react.dev' },
+      { signal: controller.signal },
+    )
+
+    const [, init] = fetchImpl.mock.calls[0]
+    const payload = JSON.parse(init?.body as string)
+    expect(payload.max_tokens).toBeGreaterThan(0)
+    expect(init?.signal).toBe(controller.signal)
+  })
+
   it('throws the API error message on a non-200 response', async () => {
     const fetchImpl = vi.fn<typeof fetch>(async () =>
       jsonResponse({ error: { message: 'Invalid API key' } }, false, 401),
@@ -81,6 +99,21 @@ describe('OpenAIProvider', () => {
     const [, init] = fetchImpl.mock.calls[0]
     const payload = JSON.parse(init?.body as string)
     expect(payload.response_format.json_schema.name).toBe('bookmark_recategorization')
-    expect(payload.messages[1].content).toContain('Aim for about 10 top-level categories.')
+    expect(payload.messages[1].content).toContain('Aim for about 10 top-level categories')
+  })
+
+  it('recategorize caps output with max_tokens and forwards the signal', async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async () =>
+      jsonResponse({ choices: [{ message: { content: JSON.stringify({ assignments: [] }) } }] }),
+    )
+    const provider = new OpenAIProvider('sk-test', { fetchImpl })
+    const controller = new AbortController()
+
+    await provider.recategorize([{ title: 'a', domain: 'a.com' }], { signal: controller.signal })
+
+    const [, init] = fetchImpl.mock.calls[0]
+    const payload = JSON.parse(init?.body as string)
+    expect(payload.max_tokens).toBeGreaterThan(0)
+    expect(init?.signal).toBe(controller.signal)
   })
 })

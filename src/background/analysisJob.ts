@@ -33,9 +33,11 @@ export async function runAnalysisJob(
 
   const analyzeOne = async (item: AnalyzeItem): Promise<StoredAnalysis> => {
     try {
-      const result = await provider.analyzeBookmark(item.input)
-      return { ...result, url: item.url, status: 'ok', analyzedAt: Date.now(), model }
+      const result = await provider.analyzeBookmark(item.input, { signal })
+      return { ...result, url: item.url, status: 'ok', analyzedAt: Date.now(), model, summarized: true }
     } catch (error) {
+      // On cancel, don't persist an error record — leave the item unanalyzed.
+      if (signal.aborted) throw error
       return {
         ...normalizeAnalysis({}),
         url: item.url,

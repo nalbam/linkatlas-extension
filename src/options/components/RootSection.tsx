@@ -10,6 +10,7 @@ interface RootSectionProps {
   root: RootTreeNode
   moveTargets: MoveTarget[]
   metadataByUrl: Record<string, BookmarkMetadata>
+  overrideUrls: Set<string>
   selectedUrls: Set<string>
   onToggleSelect: (url: string) => void
   onOpen: (url: string) => void
@@ -31,6 +32,7 @@ export function RootSection({
   root,
   moveTargets,
   metadataByUrl,
+  overrideUrls,
   selectedUrls,
   onToggleSelect,
   onOpen,
@@ -103,6 +105,7 @@ export function RootSection({
                 depth={0}
                 moveTargets={moveTargets}
                 metadataByUrl={metadataByUrl}
+                overrideUrls={overrideUrls}
                 selectedUrls={selectedUrls}
                 onToggleSelect={onToggleSelect}
                 onOpen={onOpen}

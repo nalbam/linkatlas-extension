@@ -31,6 +31,7 @@ interface PathNodeSectionProps {
   depth: number
   moveTargets: MoveTarget[]
   metadataByUrl: Record<string, BookmarkMetadata>
+  overrideUrls: Set<string>
   selectedUrls: Set<string>
   onToggleSelect: (url: string) => void
   onOpen: (url: string) => void
@@ -62,6 +63,7 @@ export function PathNodeSection({
   depth,
   moveTargets,
   metadataByUrl,
+  overrideUrls,
   selectedUrls,
   onToggleSelect,
   onOpen,
@@ -252,6 +254,14 @@ export function PathNodeSection({
                     >
                       {bookmark.title || bookmark.url}
                     </button>
+                    {overrideUrls.has(bookmark.url) && (
+                      <span
+                        className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-300"
+                        title="수동으로 이동됨 — AI 재정리에서 유지됩니다"
+                      >
+                        수동
+                      </span>
+                    )}
                     {bookmark.domain && (
                       <span className="max-w-[35%] shrink-0 truncate text-xs text-muted">
                         {bookmark.domain}
@@ -273,6 +283,7 @@ export function PathNodeSection({
                   depth={depth + 1}
                   moveTargets={moveTargets}
                   metadataByUrl={metadataByUrl}
+                  overrideUrls={overrideUrls}
                   selectedUrls={selectedUrls}
                   onToggleSelect={onToggleSelect}
                   onOpen={onOpen}

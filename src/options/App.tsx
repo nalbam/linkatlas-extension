@@ -5,9 +5,10 @@ import { collectBookmarkUrls, collectDomains, collectFolderIds, countTree } from
 import { isFolder, type TreeNode } from '@/bookmarks/types'
 import { selectFilteredBookmarks, selectVisibleRows, type ViewState } from '@/state/selectors'
 import { useAnalysisStore } from '@/state/analysisStore'
+import { useApplyStore } from '@/state/applyStore'
 import { useMetadataStore } from '@/state/metadataStore'
 import { useSettingsStore } from '@/state/settingsStore'
-import { useUiStore } from '@/state/uiStore'
+import { useUiStore, type ViewMode } from '@/state/uiStore'
 import { Button } from '@/ui/components/Button'
 import { Icon } from '@/ui/components/Icon'
 import { AnalysisBar } from './components/AnalysisBar'
@@ -15,12 +16,12 @@ import { AnalyzeDialog } from './components/AnalyzeDialog'
 import { BookmarkTreeView } from './components/BookmarkTreeView'
 import { MetadataBar } from './components/MetadataBar'
 import { OrganizeView } from './components/OrganizeView'
+import { PipelineGuide } from './components/PipelineGuide'
 import { SettingsPanel } from './components/SettingsPanel'
 import { TagStatsPanel } from './components/TagStatsPanel'
 import { Toolbar } from './components/Toolbar'
+import { derivePipelineStep } from './pipelineStep'
 import { useBookmarkTree } from './hooks/useBookmarkTree'
-
-type View = 'tree' | 'organize'
 
 const EMPTY_ROOTS: TreeNode[] = []
 
@@ -33,6 +34,8 @@ export function App() {
   const categoryFilter = useUiStore((s) => s.categoryFilter)
   const tagFilter = useUiStore((s) => s.tagFilter)
   const sortKey = useUiStore((s) => s.sortKey)
+  const viewMode = useUiStore((s) => s.viewMode)
+  const setViewMode = useUiStore((s) => s.setViewMode)
   const expandedIds = useUiStore((s) => s.expandedIds)
   const toggleExpanded = useUiStore((s) => s.toggleExpanded)
   const expandAll = useUiStore((s) => s.expandAll)
@@ -42,15 +45,22 @@ export function App() {
 
   const metadataByUrl = useMetadataStore((s) => s.byUrl)
   const loadMetadataFromCache = useMetadataStore((s) => s.loadFromCache)
+  const attachMetadata = useMetadataStore((s) => s.attach)
+  const metadataRunning = useMetadataStore((s) => s.job.running)
 
   const analysisByUrl = useAnalysisStore((s) => s.byUrl)
   const loadAnalysisFromCache = useAnalysisStore((s) => s.loadFromCache)
+  const attachAnalysis = useAnalysisStore((s) => s.attach)
+  const analysisRunning = useAnalysisStore((s) => s.job.running)
   const startAnalysis = useAnalysisStore((s) => s.startAnalysis)
+
+  const applyRunning = useApplyStore((s) => s.job.running)
+  const hasSnapshot = useApplyStore((s) => s.hasSnapshot)
+  const refreshSnapshotFlag = useApplyStore((s) => s.refreshSnapshotFlag)
 
   const provider = useSettingsStore((s) => s.provider)
   const apiKey = useSettingsStore((s) => s.apiKeys[provider])
 
-  const [viewMode, setViewMode] = useState<View>('tree')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [analyzeOpen, setAnalyzeOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
@@ -70,6 +80,26 @@ export function App() {
     }
     return [...set].sort((x, y) => x.localeCompare(y))
   }, [analysisByUrl])
+
+  const metadataCount = useMemo(
+    () => Object.values(metadataByUrl).filter((m) => m.status === 'ok').length,
+    [metadataByUrl],
+  )
+  const categorizedCount = useMemo(
+    () => Object.values(analysisByUrl).filter((a) => a.status === 'ok' && a.category).length,
+    [analysisByUrl],
+  )
+  const pipelineStatus = useMemo(
+    () =>
+      derivePipelineStep({
+        totalBookmarks: counts.bookmarks,
+        metadataCount,
+        categorizedCount,
+        hasSnapshot,
+      }),
+    [counts.bookmarks, metadataCount, categorizedCount, hasSnapshot],
+  )
+  const anyJobRunning = metadataRunning || analysisRunning || applyRunning
   const rows = useMemo(
     () => selectVisibleRows(roots, view, analysisByUrl),
     [roots, searchQuery, domainFilter, categoryFilter, tagFilter, sortKey, expandedIds, analysisByUrl],
@@ -85,12 +115,18 @@ export function App() {
     () => rows.reduce((n, row) => (row.node.type === 'bookmark' ? n + 1 : n), 0),
     [rows],
   )
+  const analyzeWithoutMeta = useMemo(
+    () => analyzeItems.filter((item) => metadataByUrl[item.url]?.status !== 'ok').length,
+    [analyzeItems, metadataByUrl],
+  )
 
-  // Hydrate cached metadata + analysis once on mount.
+  // Hydrate cached metadata + analysis once on mount, then re-attach to any job
+  // still running in the worker (e.g. after an options-page reload).
   useEffect(() => {
-    void loadMetadataFromCache()
-    void loadAnalysisFromCache()
-  }, [loadMetadataFromCache, loadAnalysisFromCache])
+    void loadMetadataFromCache().then(() => attachMetadata())
+    void loadAnalysisFromCache().then(() => attachAnalysis())
+    void refreshSnapshotFlag()
+  }, [loadMetadataFromCache, loadAnalysisFromCache, attachMetadata, attachAnalysis, refreshSnapshotFlag])
 
   // Open the top-level roots once on first run — but only after the persisted
   // expand state has hydrated, and only if nothing was saved (so a reload keeps
@@ -127,6 +163,13 @@ export function App() {
           </Button>
         </div>
       </header>
+
+      <PipelineGuide
+        status={pipelineStatus}
+        viewMode={viewMode}
+        busy={anyJobRunning}
+        onSwitchView={setViewMode}
+      />
 
       {viewMode === 'tree' ? (
         <>
@@ -196,6 +239,7 @@ export function App() {
         provider={provider}
         hasKey={apiKey.trim().length > 0}
         model=""
+        withoutMetadata={analyzeWithoutMeta}
         onConfirm={() => startAnalysis({ provider, apiKey, items: analyzeItems })}
       />
 
@@ -223,7 +267,7 @@ function CenteredMessage({ children }: { children: React.ReactNode }) {
   )
 }
 
-function ViewToggle({ view, onChange }: { view: View; onChange: (view: View) => void }) {
+function ViewToggle({ view, onChange }: { view: ViewMode; onChange: (view: ViewMode) => void }) {
   return (
     <div className="flex rounded-md border border-border bg-surface p-0.5">
       <ToggleButton active={view === 'tree'} onClick={() => onChange('tree')} icon="list" label="Tree" />

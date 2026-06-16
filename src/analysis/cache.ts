@@ -34,7 +34,12 @@ export async function clearAllCachedAnalysis(): Promise<void> {
   if (keys.length > 0) await chrome.storage.local.remove(keys)
 }
 
-/** A successful analysis is "fresh" — re-runs skip it. */
+/**
+ * A successful per-bookmark analysis is "fresh" — re-runs skip it. A
+ * recategorize-only record (`summarized === false`) has a category but no real
+ * per-bookmark signal, so it is NOT fresh and remains eligible for analysis.
+ * Legacy records (`summarized === undefined`) count as analyzed.
+ */
 export function hasFreshAnalysis(analysis: StoredAnalysis | undefined): boolean {
-  return analysis !== undefined && analysis.status === 'ok'
+  return analysis !== undefined && analysis.status === 'ok' && analysis.summarized !== false
 }

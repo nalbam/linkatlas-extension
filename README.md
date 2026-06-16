@@ -32,9 +32,11 @@ machine.
   estimate, and approximate cost before anything is sent; results overlay as
   importance badges + category chips, with a tag-statistics drawer.
 - **AI recategorize (collection-aware)** — send the whole collection to the LLM in
-  one call so it groups similar sites into a small, consistent set of categories
+  chunked calls so it groups similar sites into a small, consistent set of categories
   (~8–12 top-level, a 2nd level only for large groups), instead of per-bookmark
-  labels that drift apart. The bookmark bar and purpose groups are left out
+  labels that drift apart. The prompt favors merging over splitting, and each chunk
+  reuses the categories earlier chunks chose (a running taxonomy) so labels stay
+  consistent and the top level doesn't balloon. The bookmark bar and purpose groups are left out
   (managed manually); results update each bookmark's category and flow into the
   organize tree. Failures are surfaced in the UI.
 - **Organize view** — edit the category tree directly. The browser roots
@@ -50,6 +52,10 @@ machine.
   (북마크바 / 기타 북마크 / 모바일 북마크), reusing existing same-named folders. Post-apply summary +
   **one-click rollback** that removes only the folders this apply created, so the
   undo is complete.
+- **Pipeline guide** — a single across-the-top guide ties the stages together:
+  it highlights the current step (수집 → 분석 → 정리 → 적용), suggests the next action,
+  and switches views in one click. Long jobs survive an options-page reload
+  (the page re-attaches to a job still running) and keep the service worker alive.
 - **Popup** with quick bookmark/folder counts and a one-click "Open Manager".
 - **Settings** for choosing an AI provider and storing its API key locally
   (`chrome.storage.local`).

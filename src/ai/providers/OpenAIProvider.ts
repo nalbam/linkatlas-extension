@@ -19,6 +19,16 @@ import {
 const DEFAULT_MODEL = 'gpt-4o-mini'
 const ENDPOINT = 'https://api.openai.com/v1/chat/completions'
 
+// Per-bookmark analysis is a small fixed object; one assignment is ~12-20 tokens,
+// so size the recategorize cap to the chunk plus headroom (and never unbounded).
+const ANALYZE_MAX_TOKENS = 1024
+const RECATEGORIZE_TOKENS_PER_INPUT = 20
+const RECATEGORIZE_MAX_TOKENS_CAP = 16384
+
+function recategorizeMaxTokens(inputCount: number): number {
+  return Math.min(RECATEGORIZE_MAX_TOKENS_CAP, inputCount * RECATEGORIZE_TOKENS_PER_INPUT + 256)
+}
+
 interface OpenAIProviderOptions {
   model?: string
   /** Injectable for tests; defaults to the global fetch. */
@@ -54,16 +64,21 @@ export class OpenAIProvider implements AIProvider {
     this.endpoint = options.endpoint ?? ENDPOINT
   }
 
-  async analyzeBookmark(input: AnalyzeInput): Promise<BookmarkAnalysis> {
+  async analyzeBookmark(
+    input: AnalyzeInput,
+    options: { signal?: AbortSignal } = {},
+  ): Promise<BookmarkAnalysis> {
     const response = await this.fetchImpl(this.endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${this.apiKey}`,
       },
+      signal: options.signal,
       body: JSON.stringify({
         model: this.model,
         temperature: 0.2,
+        max_tokens: ANALYZE_MAX_TOKENS,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: buildUserPrompt(input) },
@@ -84,7 +99,7 @@ export class OpenAIProvider implements AIProvider {
 
   async recategorize(
     inputs: RecategorizeInput[],
-    options: { targetCount?: number } = {},
+    options: { targetCount?: number; signal?: AbortSignal; existingCategories?: string[] } = {},
   ): Promise<RecategorizeAssignment[]> {
     const response = await this.fetchImpl(this.endpoint, {
       method: 'POST',
@@ -92,12 +107,17 @@ export class OpenAIProvider implements AIProvider {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${this.apiKey}`,
       },
+      signal: options.signal,
       body: JSON.stringify({
         model: this.model,
         temperature: 0.2,
+        max_tokens: recategorizeMaxTokens(inputs.length),
         messages: [
           { role: 'system', content: RECATEGORIZE_SYSTEM_PROMPT },
-          { role: 'user', content: buildRecategorizeUserPrompt(inputs, options.targetCount) },
+          {
+            role: 'user',
+            content: buildRecategorizeUserPrompt(inputs, options.targetCount, options.existingCategories),
+          },
         ],
         response_format: { type: 'json_schema', json_schema: RECATEGORIZE_JSON_SCHEMA },
       }),

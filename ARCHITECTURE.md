@@ -103,10 +103,13 @@ an in-session undo history plus a full `reset`, and persists the current state
 (migrated v1/v2 → v3).
 
 **Collection recategorize** (`analysis/recategorize.ts` + `background/recategorizeJob.ts`)
-sends the whole collection to the LLM in one call — grouping similar sites into a
+sends the whole collection to the LLM in chunked calls — grouping similar sites into a
 small category hierarchy — and updates each bookmark's AI `category`/`subcategory`,
 which flows into the same tree (the bookmark bar + purpose groups are excluded and
-managed manually). This working plan is the input to the apply step.
+managed manually). The prompt favors merging over splitting (a sub-level only for
+large groups), and each chunk is given the categories earlier chunks produced (a
+**running taxonomy**) so labels stay consistent and the top level doesn't balloon
+across chunks. This working plan is the input to the apply step.
 
 ## Apply & Rollback (the only Chrome mutation)
 
@@ -141,8 +144,8 @@ single-slot — rollback undoes the most recent apply.
   mounts only the visible slice. This is the standard pattern for arbitrary-depth
   trees and is what delivers the 10k-node performance goal.
 - **AI provider abstraction** (`ai/types.ts#AIProvider`): every vendor implements
-  `analyzeBookmark` (per-bookmark) and `recategorize` (whole-collection in one
-  call). Request building and response parsing (`ai/prompts.ts`) are pure and
+  `analyzeBookmark` (per-bookmark) and `recategorize` (whole-collection, in
+  chunks). Request building and response parsing (`ai/prompts.ts`) are pure and
   shared, so providers stay thin and testable. OpenAI uses Chat Completions
   **Structured Outputs** (`response_format: json_schema`) for schema-guaranteed
   results.
@@ -173,7 +176,8 @@ single-slot — rollback undoes the most recent apply.
 | `organize/path.ts` | `Path` utils, `effectivePath` (priority resolution), `rebasePrefix`, `UNCATEGORIZED`. |
 | `organize/operations.ts` | Pure 大-forest grouping (`buildRootTree`/`buildPathTree`) + reducers (move / rename / merge / delete / create / `togglePurposeRoot` / move-to-root). |
 | `organize/migrate.ts` | Persisted `OrganizeState` v1/v2 → v3 migration. |
-| `analysis/recategorize.ts` | Build recategorize inputs (bar/purpose excluded) + fold assignments into analysis (pure). |
+| `analysis/recategorize.ts` | Build recategorize inputs (bar/purpose excluded, analysis-aware) + fold assignments into analysis (pure). |
+| `analysis/chunk.ts` | Recategorize chunking + local→global index remap + unassigned-index detection (pure). |
 | `apply/plan.ts` | Pure `buildApplyPlan` (per-大 assignments from the root forest). |
 | `apply/snapshot.ts` | Single-slot rollback snapshot in storage. |
 | `utils/batch.ts` | Concurrency-limited batch runner (rate limit + progress + abort). |
@@ -182,30 +186,36 @@ single-slot — rollback undoes the most recent apply.
 | `background/analysisJob.ts` | Analyze + cache + stream job. |
 | `background/recategorizeJob.ts` | One-call collection recategorize → update analysis cache + stream. |
 | `background/applyJob.ts` | Apply + rollback (ensure nested path per 大 root, move bookmarks, snapshot). |
+| `background/jobSession.ts` | Live job presence in `chrome.storage.session` so a reloaded page can re-attach. |
 | `state/uiStore.ts` | Search / domain / category / tag / sort + tree-expanded + organize-collapsed (expand/collapse persisted). |
 | `state/settingsStore.ts` | Provider choice + API keys (persisted). |
 | `state/metadataStore.ts` | Collected metadata (`byUrl`) + job progress (Port client). |
 | `state/analysisStore.ts` | AI analysis (`byUrl`) + job progress (Port client). |
 | `state/organizeStore.ts` | Path working state (overrides / rootOverrides / extraPaths / purposeRoots) + undo + reset (persisted, v3). |
 | `state/applyStore.ts` | Apply/rollback job progress + summary + snapshot flag. |
+| `state/connectJob.ts` | Shared Port-job client: throttle buffer + terminal/abort/cancel; stores supply callbacks. |
 | `state/selectors.ts` | `selectVisibleRows` + `selectFilteredBookmarks`. |
 | `ai/types.ts` | `AIProvider` (`analyzeBookmark` + `recategorize`), `BookmarkAnalysis`, `AnalyzeInput`, `RecategorizeInput`/`Assignment`. |
 | `ai/prompts.ts` | Analyze + recategorize system prompts, JSON schemas, `normalize`/parse. |
 | `ai/providers/OpenAIProvider.ts` | OpenAI Chat Completions client. |
 | `ai/providers/index.ts` | `createProvider` factory. |
 | `options/App.tsx` | Composition root for the manager. |
-| `background/index.ts` | Service worker lifecycle + metadata / analysis+recategorize / apply Port routers. |
+| `options/pipelineStep.ts` | Pure pipeline-step derivation (current step + next action + which view). |
+| `options/components/PipelineGuide.tsx` | Across-the-top guide: current step, next action, view switch. |
+| `background/index.ts` | Service worker lifecycle + job registry (Port re-attach) + keepalive + Port routers. |
 
 ## Testing Strategy
 
 Pure modules carry the test weight: `bookmarks/tree`, `state/selectors`,
 `metadata/parseHtml`, `metadata/fetchMetadata` (injected `fetch`), `utils/batch`,
 `analysis/analyzeInput`, `analysis/estimate`, `analysis/recategorize`,
-`organize/path`, `organize/operations`, `organize/migrate`, `apply/plan`,
-`ai/prompts`, and `ai/providers/OpenAIProvider` (injected `fetch`). This covers
+`analysis/chunk`, `organize/path`, `organize/operations`, `organize/migrate`,
+`apply/plan`, `ai/prompts`, `ai/providers/OpenAIProvider` (injected `fetch`),
+`state/connectJob` (injected Port), and `options/pipelineStep`. This covers
 search/filter/sort/flatten, the derivation pipeline, HTML extraction, fetch
 error/timeout/redirect handling, batch concurrency/abort, input building, usage
 estimation, path resolution + 大-forest grouping, the path reducers, recategorize
-input/apply, state migration, the apply planner, response normalization, and the
-provider contract — all without a browser or network (111 unit tests). Run with
-`npm test`.
+input/apply + chunking, state migration, the apply planner, response
+normalization, the provider contract, the Port-job lifecycle (terminal/abort/
+cancel), and pipeline-step derivation — all without a browser or network (142 unit
+tests). Run with `npm test`.

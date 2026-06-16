@@ -108,15 +108,23 @@ export function parseAnalysisContent(content: string): BookmarkAnalysis {
 // groups similar sites into a small, consistent set of categories.
 // ---------------------------------------------------------------------------
 
-export const RECATEGORIZE_SYSTEM_PROMPT = `You are LinkAtlas, organizing a whole bookmark collection at once.
-You receive a numbered list of bookmarks (title — domain, optional hint).
-Group them by the NATURE of each site into a SMALL, consistent set of BROAD categories.
-Rules:
-- Keep the TOP level small — about 8-12 broad top-level categories, even for hundreds of bookmarks. Reuse ONE consistent label across similar sites (always "Development", never a mix of "Dev"/"Programming").
-- But do NOT leave a large category flat: when a top-level category would hold roughly 8+ bookmarks, split it into a SECOND level by sub-topic — e.g. ["Games","Minecraft"], ["Development","Frontend"], ["Shopping","Fashion"]. Categories with only a few items stay single-level.
-- NEVER create a category or sub-category holding only 1-2 bookmarks — fold those into a broader sibling or a general "Other".
-- Base the grouping only on the given signals; never invent facts about a page.
-Return an assignment for EVERY input index.`
+export const RECATEGORIZE_SYSTEM_PROMPT = `You are LinkAtlas, organizing a bookmark collection into folders.
+Each bookmark is listed as: index, title, domain, and an optional summary/tags.
+Group bookmarks by the NATURE of each site into a SMALL, consistent set of BROAD categories.
+
+Favor FEWER, broader categories — MERGING beats splitting:
+- When unsure, put a bookmark into an existing broader category instead of inventing a new one. A handful of broad categories covering everything is better than many narrow ones.
+- Use ONE consistent label per concept (always "Development" — never a mix of "Dev"/"Programming"/"Coding"; always "AI" — never also "Machine Learning"/"LLM").
+- Do NOT create a top-level category for only 1-2 bookmarks. Merge such stragglers into the closest broader category, or a single shared "Other".
+- If two categories are near-duplicates or one is a niche slice of another, merge them.
+
+Use a SECOND level ONLY for genuinely large groups:
+- Add a sub-category ONLY when a top-level category is large (roughly 10+ bookmarks) AND splits cleanly by sub-topic — then return ["Top","Sub"] (e.g. ["Development","Frontend"]).
+- Small or medium categories stay FLAT, one segment: ["Top"].
+- Never create a sub-category for only 1-2 bookmarks; keep those directly under the top-level.
+
+Base every decision only on the given signals; never invent facts about a page.
+Return exactly one assignment for EVERY input index.`
 
 /** JSON Schema for the recategorization response (strict mode). */
 export const RECATEGORIZE_JSON_SCHEMA = {
@@ -146,15 +154,26 @@ export const RECATEGORIZE_JSON_SCHEMA = {
 export function buildRecategorizeUserPrompt(
   inputs: readonly RecategorizeInput[],
   targetCount?: number,
+  existingCategories?: readonly string[],
 ): string {
   const lines: string[] = []
   if (targetCount && targetCount > 0) {
-    lines.push(`Aim for about ${targetCount} top-level categories.`)
+    lines.push(`Aim for about ${targetCount} top-level categories across the whole collection.`)
+  }
+  if (existingCategories && existingCategories.length > 0) {
+    lines.push(
+      `Existing categories — REUSE one of these whenever a bookmark fits (a ' > ' ` +
+        `separates a sub-category, e.g. "Development > Frontend"); only add a NEW ` +
+        `category if none truly fits: ${existingCategories.join(', ')}.`,
+    )
   }
   lines.push('Bookmarks:')
   inputs.forEach((input, index) => {
     const parts = [`${input.title || '(untitled)'} — ${input.domain || '(unknown)'}`]
-    if (input.hint) parts.push(input.hint)
+    // Prefer the analysis summary (③) over the raw metadata hint when present.
+    const detail = input.summary || input.hint
+    if (detail) parts.push(detail)
+    if (input.tags?.length) parts.push(`tags: ${input.tags.join(', ')}`)
     lines.push(`${index}: ${parts.join(' — ')}`)
   })
   return lines.join('\n')

@@ -63,7 +63,7 @@ evaluated against the quality gates before the next begins.
 - [x] **大 (browser roots)** — 북마크바 / 기타 북마크 / 모바일 북마크 shown read-only at the top, with
       a 대/중/소 hierarchy under each. Bookmarks and folders move freely, across roots.
 - [x] **Collection-aware recategorize** — the whole collection goes to the LLM in
-      one call → a small, consistent category hierarchy (~8–12 top-level, 2nd level
+      chunked calls → a small, consistent category hierarchy (~8–12 top-level, 2nd level
       only for large groups). Bookmark bar excluded (managed manually). Errors surfaced.
 - [x] **Reset** (clear edits + AI classification → original folders); expand/collapse
       state persists across reloads.
@@ -88,7 +88,7 @@ explicit action.
 | Architecture | 9 | Three SW jobs share one Port/cache/store pattern; apply is a pure planner + reversible worker; consistent layering across all phases. |
 | UX | 8 | Full flow with preview + confirm + summary + rollback. Per-bookmark detail view and a dry-run diff list still pending. |
 | Performance | 8 | Tree virtualized; jobs rate-limited; apply moves are sequential. Organize rows not virtualized; large-set profiling still pending. |
-| Maintainability | 9 | Small focused modules, 111 unit tests; every domain core (paths, grouping, recategorize, apply plan, migration) tested without browser/network. |
+| Maintainability | 9 | Small focused modules, 142 unit tests; every domain core (paths, grouping, recategorize, apply plan, migration) tested without browser/network. |
 | Security | 9 | Keys local-only; host access opt-in; the destructive apply is gated by an explicit preview/confirm and is fully reversible via snapshot. |
 
 ### Actions to maintain/raise scores

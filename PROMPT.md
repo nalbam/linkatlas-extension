@@ -437,3 +437,7 @@ Continue iterating until all success criteria are satisfied.
 * 분석 결과 모아 LLM이 카테고리 재설정
 * 사용자가 카테고리 편집
 * Apply changes back to Chrome
+
+에 맞게 설계 및 구현이 되었는지 깊이 분석해. 개선 사항을 찾아.
+데이터 수집, 분석, 재설정 과정이 매그럽지 못해.
+근본 원인을 찾자. 심사숙고해.

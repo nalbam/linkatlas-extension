@@ -11,6 +11,13 @@ export interface StoredAnalysis extends BookmarkAnalysis {
   error?: string
   analyzedAt: number
   model: string
+  /**
+   * Whether per-bookmark analysis (③) filled summary/tags/importance. `false` marks
+   * a record produced by collection recategorize (④) only — it carries a
+   * category but no real per-bookmark signal, so it stays eligible for analysis.
+   * `undefined` on legacy records means "treat as analyzed" (no regression).
+   */
+  summarized?: boolean
 }
 
 /** One unit of work sent to the background analysis job. */

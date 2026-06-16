@@ -35,7 +35,12 @@ export interface AnalyzeInput {
 export interface RecategorizeInput {
   title: string
   domain: string
+  /** Metadata-derived hint (page description), used when no analysis summary exists. */
   hint?: string
+  /** Per-bookmark analysis (③) summary — richer than `hint`, so it takes priority. */
+  summary?: string
+  /** Per-bookmark analysis (③) tags — extra grouping signal. */
+  tags?: string[]
 }
 
 /** The model's category assignment for one input, by its index in the request. */
@@ -49,11 +54,15 @@ export interface AIProvider {
   readonly id: ProviderId
   /** Display name for settings UI. */
   readonly label: string
-  analyzeBookmark(input: AnalyzeInput): Promise<BookmarkAnalysis>
-  /** Group a whole collection into a small, consistent set of categories in one call. */
+  analyzeBookmark(input: AnalyzeInput, options?: { signal?: AbortSignal }): Promise<BookmarkAnalysis>
+  /**
+   * Group a (chunk of a) collection into a small, consistent set of categories.
+   * `existingCategories` carries the labels already chosen by earlier chunks so the
+   * model reuses them instead of inventing parallel ones (a running taxonomy).
+   */
   recategorize(
     inputs: RecategorizeInput[],
-    options: { targetCount?: number },
+    options: { targetCount?: number; signal?: AbortSignal; existingCategories?: string[] },
   ): Promise<RecategorizeAssignment[]>
 }
 

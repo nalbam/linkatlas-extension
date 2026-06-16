@@ -41,14 +41,41 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and the Organize view's collapsed nodes are saved to `chrome.storage.local`
   (via `uiStore`) and restored on reload; first-run still auto-expands top-level
   roots only when nothing was saved. Search/filter/sort stay ephemeral.
-- **AI recategorize (collection-aware).** A new "AI로 재정리" action sends the whole
-  collection to the LLM in **one call** and groups similar sites into a small,
+- **AI recategorize (collection-aware).** A new "AI로 재정리" action sends the
+  collection to the LLM in **chunked calls** and groups similar sites into a small,
   consistent set of categories (~8–12 top-level, a 2nd level only for large
   groups) — fixing the per-bookmark analysis's inconsistent, over-split labels.
-  The bookmark bar (manual-only) and purpose groups are excluded; results update each bookmark's AI
-  category/subcategory (preserving summary/importance) and flow straight into the
-  organize tree for preview + Apply. A scope + approximate-cost gate shows before
-  anything is sent.
+  The prompt favors **merging over splitting**: broad top-level categories, a
+  sub-level only for genuinely large groups (~10+), and small stragglers folded into
+  a broader category. Chunking keeps large collections from truncating; a failed
+  chunk doesn't lose the rest, and inputs the model leaves unassigned are surfaced as
+  failed. Each chunk reuses the categories earlier chunks chose (a **running
+  taxonomy**), so labels stay consistent and the top level stays small instead of
+  ballooning per chunk. When per-bookmark analysis (③) exists, its summary/tags feed
+  the grouping. The bookmark
+  bar (manual-only) and purpose groups are excluded, and **manually-moved bookmarks
+  are kept** (shown with a "수동" badge — recategorize leaves them as-is). Results
+  update each bookmark's category/subcategory (preserving summary/importance) and
+  flow into the organize tree for preview + Apply. A scope + approximate-cost gate
+  shows before anything is sent, and a long run is **cancellable**.
+- **Pipeline guide.** A single across-the-top guide ties the five stages
+  (수집 → 분석 → 정리 → 적용) into one flow: it highlights the current step, says what
+  to do next, and offers a one-click switch when the next action lives in the other
+  view. The active Tree/Organize view now persists across reloads, and Analyze warns
+  when bookmarks lack collected metadata (analyzed on title/URL only).
+
+### Changed
+
+- **Resilient background jobs.** Metadata / analysis / recategorize / apply jobs
+  now share one Port-client (`connectJob`) with consistent error/empty-input/done
+  handling. The worker is kept alive with `chrome.alarms` + a periodic poke during
+  long jobs, job progress is mirrored to `chrome.storage.session`, and a reloaded
+  options page **re-attaches** to a job still running instead of losing its
+  progress. A disconnect with no terminal message now surfaces as an error rather
+  than a silent stop. Adds the `alarms` permission.
+- **Recategorize-only records are re-analyzable.** A category produced by ④ alone
+  (no per-bookmark analysis) is marked `summarized: false`, so it stays eligible for
+  ③ analysis and doesn't pollute the Tree's category/tag views.
 
 ### Fixed
 

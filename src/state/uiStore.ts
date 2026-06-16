@@ -11,6 +11,8 @@ import { chromeStorageAdapter } from '@/utils/chromeStorage'
  * `chrome.storage.local` so it survives a reload; search/filter/sort stay
  * ephemeral.
  */
+export type ViewMode = 'tree' | 'organize'
+
 interface UiState {
   searchQuery: string
   /** Selected domain, or '' for "all domains". */
@@ -20,6 +22,8 @@ interface UiState {
   /** Selected AI tag, or '' for "all tags". */
   tagFilter: string
   sortKey: SortKey
+  /** Active manager view; persisted so a reload keeps the user where they were. */
+  viewMode: ViewMode
   /** Expanded folder ids in the Tree view. */
   expandedIds: Set<BookmarkId>
   /** Collapsed node keys in the Organize view (default is expanded). */
@@ -31,6 +35,7 @@ interface UiState {
   setCategoryFilter: (category: string) => void
   setTagFilter: (tag: string) => void
   setSortKey: (key: SortKey) => void
+  setViewMode: (mode: ViewMode) => void
   toggleExpanded: (id: BookmarkId) => void
   expandAll: (ids: readonly BookmarkId[]) => void
   collapseAll: () => void
@@ -45,6 +50,7 @@ export const useUiStore = create<UiState>()(
       categoryFilter: '',
       tagFilter: '',
       sortKey: 'manual',
+      viewMode: 'tree',
       expandedIds: new Set(),
       organizeCollapsed: new Set(),
       hasHydrated: false,
@@ -54,6 +60,7 @@ export const useUiStore = create<UiState>()(
       setCategoryFilter: (categoryFilter) => set({ categoryFilter }),
       setTagFilter: (tagFilter) => set({ tagFilter }),
       setSortKey: (sortKey) => set({ sortKey }),
+      setViewMode: (viewMode) => set({ viewMode }),
       toggleExpanded: (id) =>
         set((state) => {
           const expandedIds = new Set(state.expandedIds)
@@ -74,18 +81,21 @@ export const useUiStore = create<UiState>()(
     {
       name: 'linkatlas-ui',
       storage: createJSONStorage(() => chromeStorageAdapter),
-      // Only persist expand/collapse; Sets serialize as arrays and rehydrate back.
+      // Persist view + expand/collapse; Sets serialize as arrays and rehydrate back.
       partialize: (state) => ({
+        viewMode: state.viewMode,
         expandedIds: Array.from(state.expandedIds),
         organizeCollapsed: Array.from(state.organizeCollapsed),
       }),
       merge: (persisted, current) => {
         const saved = (persisted ?? {}) as {
+          viewMode?: ViewMode
           expandedIds?: BookmarkId[]
           organizeCollapsed?: string[]
         }
         return {
           ...current,
+          viewMode: saved.viewMode ?? current.viewMode,
           expandedIds: new Set(saved.expandedIds ?? []),
           organizeCollapsed: new Set(saved.organizeCollapsed ?? []),
         }

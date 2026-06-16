@@ -13,6 +13,7 @@ export const METADATA_PORT = 'linkatlas-metadata'
 
 export type ClientMessage =
   | { type: 'collect'; urls: string[] }
+  | { type: 'attach' }
   | { type: 'cancel' }
 
 export type WorkerMessage =
@@ -34,6 +35,7 @@ export type AnalysisClientMessage =
       urlByIndex: string[]
       targetCount?: number
     }
+  | { type: 'attach' }
   | { type: 'cancel' }
 
 export type AnalysisWorkerMessage =
@@ -47,6 +49,7 @@ export const APPLY_PORT = 'linkatlas-apply'
 export type ApplyClientMessage =
   | { type: 'apply'; assignments: ApplyAssignment[] }
   | { type: 'rollback' }
+  | { type: 'attach' }
   | { type: 'cancel' }
 
 export type ApplyWorkerMessage =

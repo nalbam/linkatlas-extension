@@ -67,9 +67,33 @@ describe('buildRecategorizeUserPrompt', () => {
       ],
       8,
     )
-    expect(prompt).toContain('Aim for about 8 top-level categories.')
+    expect(prompt).toContain('Aim for about 8 top-level categories')
     expect(prompt).toContain('0: React — react.dev')
     expect(prompt).toContain('1: AWS — aws.amazon.com — cloud console')
+  })
+
+  it('lists existing categories to reuse (running taxonomy)', () => {
+    const prompt = buildRecategorizeUserPrompt([{ title: 'X', domain: 'x.com' }], 8, [
+      'Development',
+      'Development > Frontend',
+      'Games',
+    ])
+    expect(prompt).toContain('REUSE')
+    expect(prompt).toContain('Development > Frontend')
+    expect(prompt).toContain('Games')
+  })
+
+  it('omits the existing-categories line when none are given', () => {
+    const prompt = buildRecategorizeUserPrompt([{ title: 'X', domain: 'x.com' }], 8)
+    expect(prompt).not.toContain('REUSE')
+  })
+
+  it('prefers the analysis summary over the hint and appends tags', () => {
+    const prompt = buildRecategorizeUserPrompt([
+      { title: 'React', domain: 'react.dev', hint: 'raw meta', summary: 'UI library docs', tags: ['React', 'UI'] },
+    ])
+    expect(prompt).toContain('0: React — react.dev — UI library docs — tags: React, UI')
+    expect(prompt).not.toContain('raw meta')
   })
 })
 

@@ -113,10 +113,12 @@ export function OrganizeView({ roots, analysisByUrl, metadataByUrl, onOpen }: Or
   const startApply = useApplyStore((s) => s.startApply)
   const rollback = useApplyStore((s) => s.rollback)
   const refreshSnapshotFlag = useApplyStore((s) => s.refreshSnapshotFlag)
+  const attachApply = useApplyStore((s) => s.attach)
 
   const provider = useSettingsStore((s) => s.provider)
   const apiKey = useSettingsStore((s) => s.apiKeys[provider])
   const startRecategorize = useAnalysisStore((s) => s.startRecategorize)
+  const cancelAnalysis = useAnalysisStore((s) => s.cancel)
   const clearAnalysis = useAnalysisStore((s) => s.clearAll)
   const analysisJob = useAnalysisStore((s) => s.job)
   const analysisError = useAnalysisStore((s) => s.error)
@@ -152,10 +154,22 @@ export function OrganizeView({ roots, analysisByUrl, metadataByUrl, onOpen }: Or
         organize.purposeRoots,
         excludeRootTitles,
         metadataByUrl,
+        analysisByUrl,
       ),
-    [bookmarks, originalPathByUrl, effectiveRootByUrl, organize.purposeRoots, excludeRootTitles, metadataByUrl],
+    [
+      bookmarks,
+      originalPathByUrl,
+      effectiveRootByUrl,
+      organize.purposeRoots,
+      excludeRootTitles,
+      metadataByUrl,
+      analysisByUrl,
+    ],
   )
   const recatEstimate = useMemo(() => estimateRecategorize(recat.inputs), [recat])
+  // URLs the user manually moved — their placement is pinned and AI recategorize
+  // leaves them as-is (override beats AI in effectivePath), so we badge them.
+  const overrideUrls = useMemo(() => new Set(Object.keys(organize.overrides)), [organize.overrides])
 
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [newName, setNewName] = useState('')
@@ -171,10 +185,12 @@ export function OrganizeView({ roots, analysisByUrl, metadataByUrl, onOpen }: Or
     seedPurposeRoots(topLevelFolderTitles(bar))
   }, [roots, seedPurposeRoots])
 
-  // Detect whether a previous apply can still be rolled back.
+  // Detect whether a previous apply can still be rolled back, and re-attach to an
+  // apply/rollback job still running in the worker (e.g. after a reload).
   useEffect(() => {
     void refreshSnapshotFlag()
-  }, [refreshSnapshotFlag])
+    void attachApply()
+  }, [refreshSnapshotFlag, attachApply])
 
   const titleOf = (rootId: string) => rootsInfo.find((r) => r.rootId === rootId)?.title ?? ''
 
@@ -321,9 +337,14 @@ export function OrganizeView({ roots, analysisByUrl, metadataByUrl, onOpen }: Or
       {(recatOpen || analysisJob.running) && (
         <div className="flex flex-wrap items-center gap-2 border-b border-border bg-surface/40 px-4 py-2 text-sm">
           {analysisJob.running ? (
-            <span className="text-slate-200">
-              AI로 재정리 중… {analysisJob.done}/{analysisJob.total}
-            </span>
+            <>
+              <span className="text-slate-200">
+                AI로 재정리 중… {analysisJob.done}/{analysisJob.total}
+              </span>
+              <Button variant="ghost" onClick={cancelAnalysis}>
+                취소
+              </Button>
+            </>
           ) : (
             <>
               <span className="text-slate-200">
@@ -421,6 +442,7 @@ export function OrganizeView({ roots, analysisByUrl, metadataByUrl, onOpen }: Or
               root={root}
               moveTargets={moveTargets}
               metadataByUrl={metadataByUrl}
+              overrideUrls={overrideUrls}
               selectedUrls={selected}
               onToggleSelect={toggleSelect}
               onOpen={onOpen}

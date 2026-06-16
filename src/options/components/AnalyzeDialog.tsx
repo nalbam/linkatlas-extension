@@ -17,6 +17,8 @@ interface AnalyzeDialogProps {
   provider: ProviderId
   hasKey: boolean
   model: string
+  /** How many of `items` lack collected metadata (analyzed on title/URL only). */
+  withoutMetadata: number
   /** Called after host permission is granted; the parent starts the job. */
   onConfirm: () => void
 }
@@ -39,6 +41,7 @@ export function AnalyzeDialog({
   provider,
   hasKey,
   model,
+  withoutMetadata,
   onConfirm,
 }: AnalyzeDialogProps) {
   const [permissionDenied, setPermissionDenied] = useState(false)
@@ -93,6 +96,12 @@ export function AnalyzeDialog({
               estimate — actual usage depends on page content and your plan.
             </p>
 
+            {withoutMetadata > 0 && (
+              <p className="text-xs text-amber-300">
+                {withoutMetadata.toLocaleString()}개는 메타데이터가 없어 제목/URL만으로 분석됩니다 —
+                먼저 "Collect metadata"를 실행하면 정확도가 올라갑니다.
+              </p>
+            )}
             {!supported && (
               <p className="text-xs text-amber-300">
                 Only OpenAI is wired up so far. Switch the provider in Settings.

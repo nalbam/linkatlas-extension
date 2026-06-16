@@ -4,17 +4,11 @@ import {
   type AnalysisClientMessage,
   type AnalysisWorkerMessage,
 } from '@/background/messages'
+import { getJobSession } from '@/background/jobSession'
 import { clearAllCachedAnalysis, getAllCachedAnalysis } from '@/analysis/cache'
 import { type AnalyzeItem, type StoredAnalysis } from '@/analysis/types'
 import { type ProviderId, type RecategorizeInput } from '@/ai/types'
-
-interface JobState {
-  running: boolean
-  total: number
-  done: number
-  ok: number
-  failed: number
-}
+import { connectJob, IDLE_JOB, type JobConnection, type JobState } from './connectJob'
 
 interface StartArgs {
   provider: ProviderId
@@ -39,79 +33,66 @@ interface AnalysisState {
   loadFromCache: () => Promise<void>
   startAnalysis: (args: StartArgs) => void
   startRecategorize: (args: StartRecategorizeArgs) => void
+  attach: () => Promise<void>
   clearAll: () => void
   cancel: () => void
 }
 
-const IDLE_JOB: JobState = { running: false, total: 0, done: 0, ok: 0, failed: 0 }
-const FLUSH_INTERVAL_MS = 200
-
-let activePort: chrome.runtime.Port | null = null
+let connection: JobConnection | null = null
 
 /**
  * Holds per-bookmark AI analysis (keyed by URL) and live job progress. The
- * worker does the provider calls; this connects the Port, streams results in,
- * and throttles store writes for large jobs. Both `startAnalysis` (per-bookmark)
- * and `startRecategorize` (whole-collection) share the same Port + merge path —
- * recategorize just updates category/subcategory of the same `byUrl` records.
+ * worker does the provider calls; this connects the Port (via the shared
+ * {@link connectJob}), streams results in, and throttles store writes for large
+ * jobs. Both `startAnalysis` (per-bookmark) and `startRecategorize`
+ * (whole-collection) share the same Port + merge path — recategorize just updates
+ * category/subcategory of the same `byUrl` records.
  */
 export const useAnalysisStore = create<AnalysisState>((set, get) => {
-  const runJob = (total: number, message: AnalysisClientMessage) => {
-    if (get().job.running || total === 0) return
-
-    const port = chrome.runtime.connect({ name: ANALYSIS_PORT })
-    activePort = port
-    set({ job: { running: true, total, done: 0, ok: 0, failed: 0 }, error: null })
-
-    let buffer: Record<string, StoredAnalysis> = {}
-    let scheduled = false
-    const flush = () => {
-      scheduled = false
-      if (Object.keys(buffer).length === 0) return
-      const incoming = buffer
-      buffer = {}
-      set((state) => ({ byUrl: { ...state.byUrl, ...incoming } }))
-    }
-
-    port.onMessage.addListener((workerMessage: AnalysisWorkerMessage) => {
-      switch (workerMessage.type) {
-        case 'progress':
-          set((state) => ({ job: { ...state.job, total: workerMessage.total, done: workerMessage.done } }))
-          break
-        case 'result':
-          buffer[workerMessage.analysis.url] = workerMessage.analysis
-          if (!scheduled) {
-            scheduled = true
-            setTimeout(flush, FLUSH_INTERVAL_MS)
-          }
-          break
-        case 'done':
-          flush()
+  const connect = (request: AnalysisClientMessage, initial: JobState) => {
+    set({ job: initial, error: null })
+    connection = connectJob<AnalysisWorkerMessage>({
+      portName: ANALYSIS_PORT,
+      request,
+      cancelMessage: { type: 'cancel' } satisfies AnalysisClientMessage,
+      buffer: {
+        isResult: (message) => message.type === 'result',
+        flush: (batch) =>
+          set((state) => {
+            const byUrl = { ...state.byUrl }
+            for (const message of batch) if (message.type === 'result') byUrl[message.analysis.url] = message.analysis
+            return { byUrl }
+          }),
+      },
+      onMessage: (message) => {
+        if (message.type === 'progress') {
+          set((state) => ({ job: { ...state.job, total: message.total, done: message.done } }))
+        } else if (message.type === 'done') {
           set((state) => ({
-            job: { ...state.job, running: false, done: workerMessage.total, ok: workerMessage.ok, failed: workerMessage.failed },
+            job: { ...state.job, running: false, done: message.total, ok: message.ok, failed: message.failed },
             error:
-              workerMessage.ok === 0 && workerMessage.total > 0
+              message.ok === 0 && message.total > 0
                 ? '0 results — the model returned no usable assignments.'
                 : null,
           }))
-          port.disconnect()
-          activePort = null
-          break
-        case 'error':
-          flush()
-          set((state) => ({ job: { ...state.job, running: false }, error: workerMessage.message }))
-          port.disconnect()
-          activePort = null
-          break
-      }
+        } else if (message.type === 'error') {
+          set((state) => ({ job: { ...state.job, running: false }, error: message.message }))
+        }
+      },
+      isTerminal: (message) => message.type === 'done' || message.type === 'error',
+      onClose: (reason) => {
+        connection = null
+        if (reason === 'abort') {
+          set((state) =>
+            state.job.running
+              ? { job: { ...state.job, running: false }, error: '연결이 끊겨 작업이 중단되었습니다.' }
+              : {},
+          )
+        }
+        // Reconcile any results missed while detached (and on clean done).
+        void get().loadFromCache()
+      },
     })
-
-    port.onDisconnect.addListener(() => {
-      activePort = null
-      set((state) => (state.job.running ? { job: { ...state.job, running: false } } : {}))
-    })
-
-    port.postMessage(message)
   }
 
   return {
@@ -123,19 +104,28 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => {
       set({ byUrl: await getAllCachedAnalysis() })
     },
 
-    startAnalysis: ({ provider, apiKey, model, items }) =>
-      runJob(items.length, { type: 'analyze', provider, apiKey, model, items }),
+    startAnalysis: ({ provider, apiKey, model, items }) => {
+      if (get().job.running || items.length === 0) return
+      connect(
+        { type: 'analyze', provider, apiKey, model, items },
+        { running: true, total: items.length, done: 0, ok: 0, failed: 0 },
+      )
+    },
 
-    startRecategorize: ({ provider, apiKey, model, inputs, urlByIndex, targetCount }) =>
-      runJob(inputs.length, {
-        type: 'recategorize',
-        provider,
-        apiKey,
-        model,
-        inputs,
-        urlByIndex,
-        targetCount,
-      }),
+    startRecategorize: ({ provider, apiKey, model, inputs, urlByIndex, targetCount }) => {
+      if (get().job.running || inputs.length === 0) return
+      connect(
+        { type: 'recategorize', provider, apiKey, model, inputs, urlByIndex, targetCount },
+        { running: true, total: inputs.length, done: 0, ok: 0, failed: 0 },
+      )
+    },
+
+    attach: async () => {
+      if (get().job.running) return
+      const session = await getJobSession(ANALYSIS_PORT)
+      if (!session?.running) return
+      connect({ type: 'attach' }, { running: true, total: session.total, done: session.done, ok: 0, failed: 0 })
+    },
 
     clearAll: () => {
       set({ byUrl: {} })
@@ -143,15 +133,7 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => {
     },
 
     cancel: () => {
-      if (activePort) {
-        try {
-          activePort.postMessage({ type: 'cancel' } satisfies AnalysisClientMessage)
-          activePort.disconnect()
-        } catch {
-          // Port already gone.
-        }
-        activePort = null
-      }
+      connection?.cancel()
       set((state) => ({ job: { ...state.job, running: false } }))
     },
   }

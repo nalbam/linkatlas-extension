@@ -64,6 +64,15 @@ describe('buildRecategorizeInputs', () => {
     })
     expect(req.inputs[0].hint?.length).toBe(100)
   })
+
+  it('passes analysis (③) summary and tags as grouping signal', () => {
+    const b = bm('https://x', 'X', 'x.com')
+    const req = buildRecategorizeInputs([b], {}, {}, [], [], {}, {
+      'https://x': ana('https://x', 'Dev', '', 'A page about React hooks'),
+    })
+    expect(req.inputs[0].summary).toBe('A page about React hooks')
+    expect(req.inputs[0].tags).toEqual(['t1'])
+  })
 })
 
 describe('applyRecategorize', () => {
@@ -89,9 +98,29 @@ describe('applyRecategorize', () => {
     })
   })
 
-  it('creates a fresh ok record when none exists', () => {
+  it('creates a category-only record (summarized:false) when none exists', () => {
     const [r] = applyRecategorize([{ index: 0, path: ['News'] }], ['https://n'], {}, 'm', 1)
-    expect(r).toMatchObject({ url: 'https://n', category: 'News', subcategory: '', status: 'ok', summary: '' })
+    expect(r).toMatchObject({
+      url: 'https://n',
+      category: 'News',
+      subcategory: '',
+      status: 'ok',
+      summary: '',
+      summarized: false,
+    })
+  })
+
+  it('preserves an existing analysis record (stays summarized)', () => {
+    const url = 'https://d'
+    const [r] = applyRecategorize(
+      [{ index: 0, path: ['Dev'] }],
+      [url],
+      { [url]: { ...ana(url, 'Old', '', 'keep'), summarized: true } },
+      'new',
+      1,
+    )
+    expect(r.summarized).toBe(true)
+    expect(r.category).toBe('Dev')
   })
 
   it('skips assignments whose index is out of range', () => {

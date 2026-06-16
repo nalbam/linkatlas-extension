@@ -11,6 +11,7 @@ import { type StoredAnalysis } from './types'
  */
 
 const HINT_MAX = 100
+const TAGS_MAX = 5
 
 type AnalysisMap = Record<string, StoredAnalysis>
 type MetadataMap = Record<string, BookmarkMetadata>
@@ -26,6 +27,9 @@ export interface RecategorizeRequest {
  * Excluded (left to manual management): bookmarks whose effective 大 root is in
  * `excludeRootTitles` (e.g. the bookmark bar) and purpose-group bookmarks
  * (original top folder ∈ purposeRoots).
+ *
+ * When per-bookmark analysis (③) exists, its summary/tags are passed as richer
+ * grouping signal (the prompt prefers the summary over the raw metadata hint).
  */
 export function buildRecategorizeInputs(
   bookmarks: readonly BookmarkNode[],
@@ -34,6 +38,7 @@ export function buildRecategorizeInputs(
   purposeRoots: readonly string[],
   excludeRootTitles: readonly string[],
   metadataByUrl: MetadataMap,
+  analysisByUrl: AnalysisMap = {},
 ): RecategorizeRequest {
   const excludedRoots = new Set(excludeRootTitles)
   const inputs: RecategorizeInput[] = []
@@ -45,10 +50,19 @@ export function buildRecategorizeInputs(
     const meta = metadataByUrl[bookmark.url]
     const hintRaw = meta?.description ?? meta?.ogDescription
     const hint = hintRaw ? hintRaw.trim().slice(0, HINT_MAX) : undefined
+    const analysis = analysisByUrl[bookmark.url]
+    const summary =
+      analysis?.status === 'ok' && analysis.summary
+        ? analysis.summary.trim().slice(0, HINT_MAX)
+        : undefined
+    const tags =
+      analysis?.status === 'ok' && analysis.tags.length ? analysis.tags.slice(0, TAGS_MAX) : undefined
     inputs.push({
       title: bookmark.title || meta?.title || meta?.ogTitle || bookmark.url,
       domain: bookmark.domain,
       hint: hint || undefined,
+      summary,
+      tags,
     })
     urlByIndex.push(bookmark.url)
   }
@@ -57,7 +71,10 @@ export function buildRecategorizeInputs(
 
 /**
  * Fold assignments into StoredAnalysis records, updating only category +
- * subcategory and preserving any existing summary/importance/tags/reason.
+ * subcategory and preserving any existing summary/importance/tags/reason. When no
+ * analysis exists yet, the new record is marked `summarized: false` — it carries a
+ * category but no per-bookmark signal, so it stays eligible for analysis (③) and
+ * doesn't pollute the Tree's category/tag views as a "fake" analyzed bookmark.
  */
 export function applyRecategorize(
   assignments: readonly RecategorizeAssignment[],
@@ -77,6 +94,7 @@ export function applyRecategorize(
       status: 'ok',
       analyzedAt: now,
       model,
+      summarized: false,
     }
     out.push({
       ...base,

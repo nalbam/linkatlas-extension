@@ -14,8 +14,9 @@ export default defineManifest({
   name: 'LinkAtlas',
   version,
   description: pkg.description,
-  // Read & (later) reorganize bookmarks; persist settings + metadata cache.
-  permissions: ['bookmarks', 'storage'],
+  // Read & reorganize bookmarks; persist settings + caches; alarms keeps the
+  // service worker alive during long jobs (metadata / analysis / recategorize).
+  permissions: ['bookmarks', 'storage', 'alarms'],
   // All host access is opt-in, requested at runtime from a user gesture:
   // - <all_urls>: page fetching for metadata ("Collect metadata").
   // - api.openai.com: direct AI analysis calls ("Analyze").

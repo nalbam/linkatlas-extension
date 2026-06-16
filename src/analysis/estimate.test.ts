@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { type AnalyzeInput } from '@/ai/types'
-import { estimateTokens, estimateUsage } from './estimate'
+import { RECATEGORIZE_SYSTEM_PROMPT } from '@/ai/prompts'
+import { type AnalyzeInput, type RecategorizeInput } from '@/ai/types'
+import { RECATEGORIZE_CHUNK_SIZE } from './chunk'
+import { estimateRecategorize, estimateTokens, estimateUsage } from './estimate'
 
 const input: AnalyzeInput = {
   title: 'React',
@@ -34,5 +36,25 @@ describe('estimateUsage', () => {
     expect(two.inputTokens).toBe(one.inputTokens * 2)
     expect(two.approxUsd).toBeGreaterThan(one.approxUsd)
     expect(one.totalTokens).toBe(one.inputTokens + one.outputTokens)
+  })
+})
+
+describe('estimateRecategorize', () => {
+  const recInput: RecategorizeInput = { title: 'React', domain: 'react.dev' }
+
+  it('counts the system prompt once per chunk', () => {
+    const within = estimateRecategorize(Array(RECATEGORIZE_CHUNK_SIZE).fill(recInput))
+    const overflow = estimateRecategorize(Array(RECATEGORIZE_CHUNK_SIZE + 1).fill(recInput))
+    // Crossing into a 2nd chunk adds another full system prompt (plus one input).
+    expect(overflow.inputTokens - within.inputTokens).toBeGreaterThan(
+      estimateTokens(RECATEGORIZE_SYSTEM_PROMPT),
+    )
+  })
+
+  it('scales output tokens with the number of bookmarks', () => {
+    const result = estimateRecategorize([recInput, recInput, recInput])
+    expect(result.bookmarks).toBe(3)
+    expect(result.outputTokens).toBeGreaterThan(0)
+    expect(result.totalTokens).toBe(result.inputTokens + result.outputTokens)
   })
 })
