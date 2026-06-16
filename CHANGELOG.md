@@ -33,11 +33,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   bookmark keeps its original 大 until moved. Apply now creates each bookmark's
   path under its assigned root (the single "Create under" picker is gone).
   Persisted state migrates v1/v2 → v3 (adds an empty root-override map).
+- **Reset.** A "리셋" button in the organize view clears all manual edits AND the
+  AI classification cache, returning the tree to the current Chrome bookmarks'
+  original folder structure (behind a confirm; not reversible). Distinct from
+  Rollback, which undoes a change already applied to Chrome.
 - **AI recategorize (collection-aware).** A new "AI로 재정리" action sends the whole
   collection to the LLM in **one call** and groups similar sites into a small,
   consistent set of categories (~10-15 top-level, a 2nd level only for large
   groups) — fixing the per-bookmark analysis's inconsistent, over-split labels.
-  Purpose groups are excluded; results update each bookmark's AI
+  The bookmark bar (manual-only) and purpose groups are excluded; results update each bookmark's AI
   category/subcategory (preserving summary/importance) and flow straight into the
   organize tree for preview + Apply. A scope + approximate-cost gate shows before
   anything is sent.

@@ -34,16 +34,32 @@ describe('buildRecategorizeInputs', () => {
     const req = buildRecategorizeInputs(
       [work, dev],
       { 'https://w': ['karrot', 'pay'], 'https://d': ['6.Devlop'] },
+      { 'https://w': 'Other', 'https://d': 'Other' },
       ['karrot'],
+      [],
       {},
     )
     expect(req.urlByIndex).toEqual(['https://d'])
     expect(req.inputs).toEqual([{ title: 'Dev', domain: 'github.com', hint: undefined }])
   })
 
+  it('excludes bookmarks whose 大 root is in excludeRootTitles (bookmark bar = manual)', () => {
+    const barItem = bm('https://bar', 'Bar item', 'bar.com')
+    const otherItem = bm('https://other', 'Other item', 'o.com')
+    const req = buildRecategorizeInputs(
+      [barItem, otherItem],
+      {},
+      { 'https://bar': 'Bookmarks Bar', 'https://other': 'Other Bookmarks' },
+      [],
+      ['Bookmarks Bar'],
+      {},
+    )
+    expect(req.urlByIndex).toEqual(['https://other'])
+  })
+
   it('adds a trimmed metadata hint capped at 100 chars', () => {
     const b = bm('https://x', 'X', 'x.com')
-    const req = buildRecategorizeInputs([b], {}, [], {
+    const req = buildRecategorizeInputs([b], {}, {}, [], [], {
       'https://x': meta('https://x', '  ' + 'a'.repeat(200)),
     })
     expect(req.inputs[0].hint?.length).toBe(100)

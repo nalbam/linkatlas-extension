@@ -23,18 +23,23 @@ export interface RecategorizeRequest {
 
 /**
  * Build the recategorization request from the category-eligible bookmarks.
- * Purpose-group bookmarks (original top folder ∈ purposeRoots) are excluded so
- * the user's intentional folders are left untouched.
+ * Excluded (left to manual management): bookmarks whose effective 大 root is in
+ * `excludeRootTitles` (e.g. the bookmark bar) and purpose-group bookmarks
+ * (original top folder ∈ purposeRoots).
  */
 export function buildRecategorizeInputs(
   bookmarks: readonly BookmarkNode[],
   originalPathByUrl: Record<string, string[]>,
+  rootTitleByUrl: Record<string, string>,
   purposeRoots: readonly string[],
+  excludeRootTitles: readonly string[],
   metadataByUrl: MetadataMap,
 ): RecategorizeRequest {
+  const excludedRoots = new Set(excludeRootTitles)
   const inputs: RecategorizeInput[] = []
   const urlByIndex: string[] = []
   for (const bookmark of bookmarks) {
+    if (excludedRoots.has(rootTitleByUrl[bookmark.url] ?? '')) continue
     const original = originalPathByUrl[bookmark.url] ?? []
     if (original.length > 0 && purposeRoots.includes(original[0])) continue
     const meta = metadataByUrl[bookmark.url]

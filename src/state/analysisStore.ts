@@ -4,7 +4,7 @@ import {
   type AnalysisClientMessage,
   type AnalysisWorkerMessage,
 } from '@/background/messages'
-import { getAllCachedAnalysis } from '@/analysis/cache'
+import { clearAllCachedAnalysis, getAllCachedAnalysis } from '@/analysis/cache'
 import { type AnalyzeItem, type StoredAnalysis } from '@/analysis/types'
 import { type ProviderId, type RecategorizeInput } from '@/ai/types'
 
@@ -38,6 +38,7 @@ interface AnalysisState {
   loadFromCache: () => Promise<void>
   startAnalysis: (args: StartArgs) => void
   startRecategorize: (args: StartRecategorizeArgs) => void
+  clearAll: () => void
   cancel: () => void
 }
 
@@ -129,6 +130,11 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => {
         urlByIndex,
         targetCount,
       }),
+
+    clearAll: () => {
+      set({ byUrl: {} })
+      void clearAllCachedAnalysis()
+    },
 
     cancel: () => {
       if (activePort) {

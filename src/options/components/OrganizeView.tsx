@@ -104,6 +104,7 @@ export function OrganizeView({ roots, analysisByUrl, metadataByUrl, onOpen }: Or
   const togglePurposeRoot = useOrganizeStore((s) => s.togglePurposeRoot)
   const seedPurposeRoots = useOrganizeStore((s) => s.seedPurposeRoots)
   const undo = useOrganizeStore((s) => s.undo)
+  const reset = useOrganizeStore((s) => s.reset)
 
   const applyJob = useApplyStore((s) => s.job)
   const lastSummary = useApplyStore((s) => s.lastSummary)
@@ -116,6 +117,7 @@ export function OrganizeView({ roots, analysisByUrl, metadataByUrl, onOpen }: Or
   const provider = useSettingsStore((s) => s.provider)
   const apiKey = useSettingsStore((s) => s.apiKeys[provider])
   const startRecategorize = useAnalysisStore((s) => s.startRecategorize)
+  const clearAnalysis = useAnalysisStore((s) => s.clearAll)
   const analysisJob = useAnalysisStore((s) => s.job)
 
   const bookmarks = useMemo(() => collectBookmarks(roots), [roots])
@@ -131,9 +133,26 @@ export function OrganizeView({ roots, analysisByUrl, metadataByUrl, onOpen }: Or
   )
   const moveTargets = useMemo(() => collectMoveTargets(tree), [tree])
   const plan = useMemo(() => buildApplyPlan(tree), [tree])
+  // The bookmark bar (大 root id '1') is managed manually — never AI-recategorized.
+  const effectiveRootByUrl = useMemo(
+    () => ({ ...originalRootByUrl, ...organize.rootOverrides }),
+    [originalRootByUrl, organize.rootOverrides],
+  )
+  const excludeRootTitles = useMemo(() => {
+    const bar = roots.find((r) => r.id === '1')
+    return bar ? [bar.title] : []
+  }, [roots])
   const recat = useMemo(
-    () => buildRecategorizeInputs(bookmarks, originalPathByUrl, organize.purposeRoots, metadataByUrl),
-    [bookmarks, originalPathByUrl, organize.purposeRoots, metadataByUrl],
+    () =>
+      buildRecategorizeInputs(
+        bookmarks,
+        originalPathByUrl,
+        effectiveRootByUrl,
+        organize.purposeRoots,
+        excludeRootTitles,
+        metadataByUrl,
+      ),
+    [bookmarks, originalPathByUrl, effectiveRootByUrl, organize.purposeRoots, excludeRootTitles, metadataByUrl],
   )
   const recatEstimate = useMemo(() => estimateRecategorize(recat.inputs), [recat])
 
@@ -143,6 +162,7 @@ export function OrganizeView({ roots, analysisByUrl, metadataByUrl, onOpen }: Or
   const [applyOpen, setApplyOpen] = useState(false)
   const [recatOpen, setRecatOpen] = useState(false)
   const [targetCount, setTargetCount] = useState(8)
+  const [resetOpen, setResetOpen] = useState(false)
 
   // Auto-detect purpose groups from the bookmark bar's top-level folders (once).
   useEffect(() => {
@@ -221,6 +241,16 @@ export function OrganizeView({ roots, analysisByUrl, metadataByUrl, onOpen }: Or
     setRecatOpen(false)
   }
 
+  // Reset everything back to the current Chrome bookmarks: clear all manual
+  // organize edits AND the AI classification cache.
+  const handleReset = () => {
+    reset()
+    clearAnalysis()
+    setSelected(new Set())
+    setRecatOpen(false)
+    setResetOpen(false)
+  }
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex flex-wrap items-center gap-2 border-b border-border bg-surface/40 px-4 py-2">
@@ -247,6 +277,14 @@ export function OrganizeView({ roots, analysisByUrl, metadataByUrl, onOpen }: Or
         >
           <Icon name="sparkle" size={16} />
           AI로 재정리
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={() => setResetOpen((open) => !open)}
+          title="모든 편집·AI 분류를 지우고 원본 폴더 구조로 되돌리기"
+        >
+          <Icon name="refresh" size={16} />
+          리셋
         </Button>
 
         {selected.size > 0 && (
@@ -308,6 +346,20 @@ export function OrganizeView({ roots, analysisByUrl, metadataByUrl, onOpen }: Or
               </Button>
             </>
           )}
+        </div>
+      )}
+
+      {resetOpen && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-border bg-surface/40 px-4 py-2 text-sm">
+          <span className="text-rose-300">
+            모든 organize 편집과 AI 분류를 지우고 원본 Chrome 폴더 구조로 되돌립니다. 되돌릴 수 없습니다.
+          </span>
+          <Button variant="primary" onClick={handleReset}>
+            초기화
+          </Button>
+          <Button variant="ghost" onClick={() => setResetOpen(false)}>
+            취소
+          </Button>
         </div>
       )}
 
