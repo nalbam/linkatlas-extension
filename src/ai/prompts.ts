@@ -111,11 +111,10 @@ export function parseAnalysisContent(content: string): BookmarkAnalysis {
 export const RECATEGORIZE_SYSTEM_PROMPT = `You are LinkAtlas, organizing a whole bookmark collection at once.
 You receive a numbered list of bookmarks (title — domain, optional hint).
 Group them by the NATURE of each site into a SMALL, consistent set of BROAD categories.
-Rules — bias hard toward FEWER categories:
-- Use as few top-level categories as possible — about 8-12 total, even for hundreds of bookmarks. Fewer is much better than more.
-- Strongly prefer an existing broad category over inventing a new niche one. NEVER create a category holding only 1-2 bookmarks — fold those into a broader related category (or a general "Other").
-- Reuse ONE consistent label across similar sites (always "Development", never a mix of "Dev"/"Programming"/"Coding").
-- Keep almost everything at a SINGLE level. Add a second level ONLY when one category clearly holds many items (roughly 15+); otherwise always use one level — ["Development"], not ["Development","Frontend"].
+Rules:
+- Keep the TOP level small — about 8-12 broad top-level categories, even for hundreds of bookmarks. Reuse ONE consistent label across similar sites (always "Development", never a mix of "Dev"/"Programming").
+- But do NOT leave a large category flat: when a top-level category would hold roughly 8+ bookmarks, split it into a SECOND level by sub-topic — e.g. ["Games","Minecraft"], ["Development","Frontend"], ["Shopping","Fashion"]. Categories with only a few items stay single-level.
+- NEVER create a category or sub-category holding only 1-2 bookmarks — fold those into a broader sibling or a general "Other".
 - Base the grouping only on the given signals; never invent facts about a page.
 Return an assignment for EVERY input index.`
 

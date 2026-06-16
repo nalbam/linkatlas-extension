@@ -1,15 +1,17 @@
 # LinkAtlas — AI Bookmark Organizer
 
 LinkAtlas is a Chrome extension (Manifest V3) that turns a messy bookmark
-collection into an intelligent, searchable knowledge system. It reads your
-Chrome bookmarks, visualizes them as a fast virtualized tree, and (in upcoming
-phases) uses pluggable LLM providers to summarize, categorize, tag, and
-reorganize them — all locally driven, with your API key, on your machine.
+collection into an organized one. It reads your Chrome bookmarks, fetches each
+page and uses a pluggable LLM to analyze what the site is, then asks the LLM to
+re-cluster the whole collection into a small category hierarchy — which you can
+edit and apply back to Chrome. All locally driven, with your API key, on your
+machine.
 
-> **Status — MVP complete (Phase 5).** The full loop works end-to-end: read your
-> bookmarks → collect metadata → analyze with AI (categories, tags, importance) →
-> reorganize into categories → **preview** → **apply to Chrome** → **rollback**.
-> Remaining items are refinements — see [ROADMAP.md](./ROADMAP.md).
+> **Status — core loop complete.** End-to-end:
+> ① read bookmarks → ② fetch each page + analyze the site with an LLM →
+> ③ the LLM **re-clusters** the collection into a category hierarchy →
+> ④ **edit** categories → ⑤ **apply to Chrome** (with **rollback**).
+> See [ROADMAP.md](./ROADMAP.md).
 
 ## Features
 
@@ -24,18 +26,30 @@ reorganize them — all locally driven, with your API key, on your machine.
 - **Metadata collection** — fetch each page's favicon, title, description,
   OpenGraph, and keywords with batching, rate limiting, timeouts, and an
   incremental cache. Favicons and descriptions render inline in the tree.
-- **AI analysis** — generate `{summary, category, subcategory, tags, importance,
-  reason}` per bookmark via a pluggable provider (OpenAI implemented). A
-  cost/consent gate shows the scope, token estimate, and approximate cost before
-  anything is sent; results overlay as importance badges + category chips, with a
-  tag-statistics drawer.
-- **Category management** (Organize view) — reorganize bookmarks into categories
-  with create / rename / merge / delete, drag-and-drop or multi-select move, and
-  undo. Edits a local working plan only.
+- **AI analysis** — fetch a page's signals, then have a pluggable LLM (OpenAI
+  implemented) analyze the site into `{summary, category, subcategory, tags,
+  importance, reason}` per bookmark. A cost/consent gate shows scope, token
+  estimate, and approximate cost before anything is sent; results overlay as
+  importance badges + category chips, with a tag-statistics drawer.
+- **AI recategorize (collection-aware)** — send the whole collection to the LLM in
+  one call so it groups similar sites into a small, consistent set of categories
+  (~8–12 top-level, a 2nd level only for large groups), instead of per-bookmark
+  labels that drift apart. The bookmark bar and purpose groups are left out
+  (managed manually); results update each bookmark's category and flow into the
+  organize tree. Failures are surfaced in the UI.
+- **Organize view** — edit the category tree directly. The browser roots
+  (북마크바 / 기타 북마크) show as read-only **大** nodes, with a **대/중/소** path
+  hierarchy under each. **Purpose groups** (your own folders, e.g. a company or
+  personal folder) are preserved as-is and skip AI classification; everything else
+  is grouped by AI category. Drag bookmarks or folders (across roots too), rename /
+  merge / delete / create, toggle purpose↔category — with **undo** and a **reset**
+  that clears edits + AI classification back to the original folders. Expand/collapse
+  state persists across reloads. Edits a local working plan only.
 - **Apply to Chrome** — materialize the plan as real bookmark folders behind a
-  preview + confirm gate, with a post-apply summary and **one-click rollback**
-  (categorized bookmarks move into category folders; Uncategorized and original
-  folders are left untouched, so the undo is complete).
+  preview + confirm gate: each bookmark's path is created under its assigned root
+  (북마크바 / 기타 북마크), reusing existing same-named folders. Post-apply summary +
+  **one-click rollback** that removes only the folders this apply created, so the
+  undo is complete.
 - **Popup** with quick bookmark/folder counts and a one-click "Open Manager".
 - **Settings** for choosing an AI provider and storing its API key locally
   (`chrome.storage.local`).
@@ -79,17 +93,17 @@ npm run build    # Production build into dist/
 
 ```
 src/
-├─ background/   MV3 service worker: metadata + analysis jobs over typed Ports
+├─ background/   MV3 service worker: metadata + analysis + recategorize + apply jobs over typed Ports
 ├─ popup/        Toolbar popup: stats + "Open Manager"
 ├─ options/      Full-page manager app (Tree + Organize views)
 │  ├─ components/  BookmarkTreeView, Toolbar, MetadataBar, AnalysisBar,
-│  │               AnalyzeDialog, TagStatsPanel, OrganizeView, CategorySection,
-│  │               ApplyDialog, SettingsPanel
+│  │               AnalyzeDialog, TagStatsPanel, OrganizeView, RootSection,
+│  │               CategorySection, ApplyDialog, SettingsPanel
 │  └─ hooks/       useBookmarkTree, useDebouncedValue
 ├─ services/     Framework-agnostic data access (bookmarkService)
-├─ ai/           Provider abstraction + OpenAI implementation + prompts
-├─ analysis/     Pure analyze-input + token/cost estimate + cache + types
-├─ organize/     Pure category reducers + grouping + types
+├─ ai/           Provider abstraction + OpenAI (analyze + recategorize) + prompts
+├─ analysis/     Pure analyze-input + recategorize + token/cost estimate + cache + types
+├─ organize/     Pure path-based grouping + reducers (大/中/小, purpose vs category) + migrate + types
 ├─ apply/        Pure apply planner + snapshot + types
 ├─ bookmarks/    Domain model + Chrome adapter + pure tree utilities
 ├─ metadata/     Pure HTML parser + resilient fetcher + cache + types

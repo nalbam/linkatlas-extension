@@ -12,18 +12,18 @@ UI         ui/components · options/components + hooks
 State      state/ (Zustand stores) + selectors (pure) · utils/queryClient
 Services   services/ (framework-agnostic data access)
 Domain     bookmarks/ (model + tree utils) · metadata/ (parser/fetcher/cache)
-           analysis/ (input/estimate/cache) · organize/ (reducers + grouping)
+           analysis/ (input/estimate/recategorize/cache) · organize/ (path + grouping + reducers)
            apply/ (planner + snapshot) · ai/ (abstraction + prompts)
 Adapters   chromeBookmarks · metadata/cache · analysis/cache · apply/snapshot
            ai/providers/* · utils/chromeStorage
-           background jobs (metadata + analysis + apply/rollback)
+           background jobs (metadata + analysis + recategorize + apply/rollback)
 ```
 
 Dependencies point downward only. `bookmarks/tree.ts`, `state/selectors.ts`,
 `metadata/parseHtml.ts`, `utils/batch.ts`, `analysis/estimate.ts`,
-`analysis/analyzeInput.ts`, `organize/operations.ts`, `apply/plan.ts`, and
-`ai/prompts.ts` import nothing from React or Chrome, which is what keeps them
-fast and trivially testable.
+`analysis/analyzeInput.ts`, `analysis/recategorize.ts`, `organize/path.ts`,
+`organize/operations.ts`, `apply/plan.ts`, and `ai/prompts.ts` import nothing from
+React or Chrome, which is what keeps them fast and trivially testable.
 
 ## Data Flow (read path)
 
@@ -87,22 +87,36 @@ filters (`selectFilteredBookmarks`), so filtering narrows what gets sent.
 
 ## Category Management (working state)
 
-The Organize view edits a **working plan**, not Chrome. `organizeStore` holds an
-`OrganizeState = { overrides, extraCategories }`; a bookmark's category resolves
-`override → AI category → Uncategorized` (`effectiveCategory`). All mutations are
-pure reducers in `organize/operations.ts` (create / rename / merge / delete /
-move) — the store computes the affected URLs from the current grouping and calls
-the reducer, so the reducers stay membership-agnostic and testable. The store
-keeps an in-session undo history and persists only the current state. This
-working plan is the input to the apply step.
+The Organize view edits a **working plan**, not Chrome. A bookmark's placement is
+a **path** of 中/小 segments under a **大 root** (大 = bookmark bar / other —
+fixed by the browser). `organizeStore` holds `OrganizeState = { overrides,
+rootOverrides, extraPaths, purposeRoots }`; `effectivePath` resolves the path as
+`manual override → original folder path when its top folder is a purpose root
+(AI ignored) → AI [category, subcategory] → original folder path → Uncategorized`,
+and `effectiveRoot` is `rootOverride → original 大`. `buildRootTree` buckets
+bookmarks by 大 (rendered read-only) and, within each, the existing `buildPathTree`
+builds the nested 中/小 tree. All mutations are pure, membership-agnostic reducers
+in `organize/operations.ts` (create / move / rename / merge / delete /
+`togglePurposeRoot` / `moveBookmarksToRoot` / `moveSubtreeToRoot`) — the caller
+passes the affected placements computed from the current grouping. The store keeps
+an in-session undo history plus a full `reset`, and persists the current state
+(migrated v1/v2 → v3).
+
+**Collection recategorize** (`analysis/recategorize.ts` + `background/recategorizeJob.ts`)
+sends the whole collection to the LLM in one call — grouping similar sites into a
+small category hierarchy — and updates each bookmark's AI `category`/`subcategory`,
+which flows into the same tree (the bookmark bar + purpose groups are excluded and
+managed manually). This working plan is the input to the apply step.
 
 ## Apply & Rollback (the only Chrome mutation)
 
 Applying the plan is the one place LinkAtlas writes to Chrome. `buildApplyPlan`
-turns the grouping into assignments (excluding Uncategorized + empty), shown in
-`ApplyDialog` as a preview. On confirm, `runApplyJob` (service worker) creates a
-container + per-category folders (`ensureFolder` reuses same-named ones) and
-moves each categorized bookmark in — **sequentially**, to avoid index races.
+walks the 大 forest into assignments `{rootId, path, bookmarkIds}` (excluding
+Uncategorized + empty), shown in `ApplyDialog` as a preview. On confirm,
+`runApplyJob` (service worker) ensures each assignment's nested folder path
+**directly under its assigned 大 root** (`ensureFolder` reuses same-named ones, so
+it merges into folders you already have — no container) and moves each bookmark in
+— **sequentially**, to avoid index races.
 
 Reversibility is built in: before each move the bookmark's original
 `{parentId, index}` is recorded to an `ApplySnapshot` (plus the ids of folders we
@@ -127,10 +141,11 @@ single-slot — rollback undoes the most recent apply.
   mounts only the visible slice. This is the standard pattern for arbitrary-depth
   trees and is what delivers the 10k-node performance goal.
 - **AI provider abstraction** (`ai/types.ts#AIProvider`): every vendor implements
-  one `analyzeBookmark` contract. Request building and response parsing
-  (`ai/prompts.ts`) are pure and shared, so providers stay thin and testable.
-  OpenAI uses Chat Completions **Structured Outputs** (`response_format:
-  json_schema`) for schema-guaranteed results.
+  `analyzeBookmark` (per-bookmark) and `recategorize` (whole-collection in one
+  call). Request building and response parsing (`ai/prompts.ts`) are pure and
+  shared, so providers stay thin and testable. OpenAI uses Chat Completions
+  **Structured Outputs** (`response_format: json_schema`) for schema-guaranteed
+  results.
 - **Local-only secrets**: API keys persist through a `chrome.storage.local`
   Zustand adapter (`utils/chromeStorage.ts`) — never bundled, never synced.
 - **On-demand host access**: every host is `optional_host_permissions`, requested
@@ -155,36 +170,42 @@ single-slot — rollback undoes the most recent apply.
 | `analysis/analyzeInput.ts` | Build model input from bookmark + metadata (pure). |
 | `analysis/estimate.ts` | Token/cost estimate for the privacy gate (pure). |
 | `analysis/cache.ts` | `chrome.storage.local` analysis cache + freshness. |
-| `organize/operations.ts` | Pure category reducers + `groupByCategory` + `effectiveCategory`. |
-| `apply/plan.ts` | Pure `buildApplyPlan` (preview from grouping). |
+| `organize/path.ts` | `Path` utils, `effectivePath` (priority resolution), `rebasePrefix`, `UNCATEGORIZED`. |
+| `organize/operations.ts` | Pure 大-forest grouping (`buildRootTree`/`buildPathTree`) + reducers (move / rename / merge / delete / create / `togglePurposeRoot` / move-to-root). |
+| `organize/migrate.ts` | Persisted `OrganizeState` v1/v2 → v3 migration. |
+| `analysis/recategorize.ts` | Build recategorize inputs (bar/purpose excluded) + fold assignments into analysis (pure). |
+| `apply/plan.ts` | Pure `buildApplyPlan` (per-大 assignments from the root forest). |
 | `apply/snapshot.ts` | Single-slot rollback snapshot in storage. |
 | `utils/batch.ts` | Concurrency-limited batch runner (rate limit + progress + abort). |
-| `background/messages.ts` | Typed Port contracts (metadata + analysis + apply). |
+| `background/messages.ts` | Typed Port contracts (metadata + analysis/recategorize + apply). |
 | `background/metadataJob.ts` | Fetch + cache + stream job. |
 | `background/analysisJob.ts` | Analyze + cache + stream job. |
-| `background/applyJob.ts` | Apply + rollback (create folders, move bookmarks, snapshot). |
-| `state/uiStore.ts` | Search / domain / category / tag / sort / expanded state. |
+| `background/recategorizeJob.ts` | One-call collection recategorize → update analysis cache + stream. |
+| `background/applyJob.ts` | Apply + rollback (ensure nested path per 大 root, move bookmarks, snapshot). |
+| `state/uiStore.ts` | Search / domain / category / tag / sort + tree-expanded + organize-collapsed (expand/collapse persisted). |
 | `state/settingsStore.ts` | Provider choice + API keys (persisted). |
 | `state/metadataStore.ts` | Collected metadata (`byUrl`) + job progress (Port client). |
 | `state/analysisStore.ts` | AI analysis (`byUrl`) + job progress (Port client). |
-| `state/organizeStore.ts` | Category working state + undo history (persisted). |
+| `state/organizeStore.ts` | Path working state (overrides / rootOverrides / extraPaths / purposeRoots) + undo + reset (persisted, v3). |
 | `state/applyStore.ts` | Apply/rollback job progress + summary + snapshot flag. |
 | `state/selectors.ts` | `selectVisibleRows` + `selectFilteredBookmarks`. |
-| `ai/types.ts` | `AIProvider`, `BookmarkAnalysis`, `AnalyzeInput`. |
-| `ai/prompts.ts` | System prompt, JSON schema, `normalizeAnalysis`, parsing. |
+| `ai/types.ts` | `AIProvider` (`analyzeBookmark` + `recategorize`), `BookmarkAnalysis`, `AnalyzeInput`, `RecategorizeInput`/`Assignment`. |
+| `ai/prompts.ts` | Analyze + recategorize system prompts, JSON schemas, `normalize`/parse. |
 | `ai/providers/OpenAIProvider.ts` | OpenAI Chat Completions client. |
 | `ai/providers/index.ts` | `createProvider` factory. |
 | `options/App.tsx` | Composition root for the manager. |
-| `background/index.ts` | Service worker lifecycle + metadata/analysis Port routers. |
+| `background/index.ts` | Service worker lifecycle + metadata / analysis+recategorize / apply Port routers. |
 
 ## Testing Strategy
 
 Pure modules carry the test weight: `bookmarks/tree`, `state/selectors`,
 `metadata/parseHtml`, `metadata/fetchMetadata` (injected `fetch`), `utils/batch`,
-`analysis/analyzeInput`, `analysis/estimate`, `organize/operations`, `apply/plan`,
+`analysis/analyzeInput`, `analysis/estimate`, `analysis/recategorize`,
+`organize/path`, `organize/operations`, `organize/migrate`, `apply/plan`,
 `ai/prompts`, and `ai/providers/OpenAIProvider` (injected `fetch`). This covers
-search/filter/sort/flatten, the derivation pipeline (including importance sort +
-category/tag filters), HTML extraction, fetch error/timeout/redirect handling,
-batch concurrency/abort, input building, usage estimation, category
-reducers/grouping, response normalization, and the provider contract — all
-without a browser or network. Run with `npm test`.
+search/filter/sort/flatten, the derivation pipeline, HTML extraction, fetch
+error/timeout/redirect handling, batch concurrency/abort, input building, usage
+estimation, path resolution + 大-forest grouping, the path reducers, recategorize
+input/apply, state migration, the apply planner, response normalization, and the
+provider contract — all without a browser or network (111 unit tests). Run with
+`npm test`.

@@ -427,3 +427,13 @@ A user can:
 without leaving the extension.
 
 Continue iterating until all success criteria are satisfied.
+
+---
+
+# Goal
+
+* Read Chrome bookmarks
+* URL 조회 → LLM으로 사이트 정보 분석
+* 분석 결과 모아 LLM이 카테고리 재설정
+* 사용자가 카테고리 편집
+* Apply changes back to Chrome

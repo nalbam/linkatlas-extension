@@ -37,6 +37,7 @@ export function App() {
   const toggleExpanded = useUiStore((s) => s.toggleExpanded)
   const expandAll = useUiStore((s) => s.expandAll)
   const collapseAll = useUiStore((s) => s.collapseAll)
+  const hasHydrated = useUiStore((s) => s.hasHydrated)
   const setTagFilter = useUiStore((s) => s.setTagFilter)
 
   const metadataByUrl = useMetadataStore((s) => s.byUrl)
@@ -91,13 +92,17 @@ export function App() {
     void loadAnalysisFromCache()
   }, [loadMetadataFromCache, loadAnalysisFromCache])
 
-  // Open the top-level roots once so the user sees structure immediately.
+  // Open the top-level roots once on first run — but only after the persisted
+  // expand state has hydrated, and only if nothing was saved (so a reload keeps
+  // the user's own expand/collapse).
   useEffect(() => {
-    if (!didInit && roots.length > 0) {
-      expandAll(roots.filter(isFolder).map((node) => node.id))
+    if (!didInit && hasHydrated && roots.length > 0) {
+      if (expandedIds.size === 0) {
+        expandAll(roots.filter(isFolder).map((node) => node.id))
+      }
       setDidInit(true)
     }
-  }, [didInit, roots, expandAll])
+  }, [didInit, hasHydrated, roots, expandedIds, expandAll])
 
   return (
     <div className="flex h-screen flex-col">

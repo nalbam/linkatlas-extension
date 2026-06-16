@@ -2,6 +2,7 @@ import { type DragEvent, useState } from 'react'
 import { type BookmarkMetadata } from '@/metadata/types'
 import { type Path, pathKey } from '@/organize/path'
 import { type PathTreeNode, type RootTreeNode } from '@/organize/types'
+import { useUiStore } from '@/state/uiStore'
 import { Icon } from '@/ui/components/Icon'
 import { DRAG_MIME, type DragPayload, type MoveTarget, PathNodeSection } from './CategorySection'
 
@@ -40,7 +41,9 @@ export function RootSection({
   onDelete,
   onTogglePurpose,
 }: RootSectionProps) {
-  const [collapsed, setCollapsed] = useState(false)
+  const collapseKey = pathKey([root.rootId])
+  const collapsed = useUiStore((s) => s.organizeCollapsed.has(collapseKey))
+  const toggleCollapsed = useUiStore((s) => s.toggleOrganizeCollapsed)
   const [dragOver, setDragOver] = useState(false)
 
   const handleDrop = (event: DragEvent) => {
@@ -75,7 +78,7 @@ export function RootSection({
       <header className="flex items-center gap-2 px-3 py-2">
         <button
           type="button"
-          onClick={() => setCollapsed((c) => !c)}
+          onClick={() => toggleCollapsed(collapseKey)}
           className={`text-muted transition-transform ${collapsed ? '' : 'rotate-90'}`}
           title={collapsed ? 'Expand' : 'Collapse'}
         >

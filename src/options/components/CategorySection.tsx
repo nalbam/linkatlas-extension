@@ -2,6 +2,7 @@ import { type DragEvent, useState } from 'react'
 import { type BookmarkMetadata } from '@/metadata/types'
 import { type Path, UNCATEGORIZED, hasPrefix, pathKey } from '@/organize/path'
 import { type PathTreeNode } from '@/organize/types'
+import { useUiStore } from '@/state/uiStore'
 import { Button } from '@/ui/components/Button'
 import { Favicon } from '@/ui/components/Favicon'
 import { Icon } from '@/ui/components/Icon'
@@ -71,7 +72,9 @@ export function PathNodeSection({
   onDelete,
   onTogglePurpose,
 }: PathNodeSectionProps) {
-  const [collapsed, setCollapsed] = useState(false)
+  const collapseKey = pathKey([rootId, ...node.path])
+  const collapsed = useUiStore((s) => s.organizeCollapsed.has(collapseKey))
+  const toggleCollapsed = useUiStore((s) => s.toggleOrganizeCollapsed)
   const [renaming, setRenaming] = useState(false)
   const [draft, setDraft] = useState(node.segment)
   const [dragOver, setDragOver] = useState(false)
@@ -139,7 +142,7 @@ export function PathNodeSection({
       >
         <button
           type="button"
-          onClick={() => setCollapsed((c) => !c)}
+          onClick={() => toggleCollapsed(collapseKey)}
           className={`text-muted transition-transform ${collapsed ? '' : 'rotate-90'}`}
           title={collapsed ? 'Expand' : 'Collapse'}
         >

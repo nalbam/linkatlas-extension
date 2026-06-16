@@ -35,6 +35,7 @@ interface StartRecategorizeArgs {
 interface AnalysisState {
   byUrl: Record<string, StoredAnalysis>
   job: JobState
+  error: string | null
   loadFromCache: () => Promise<void>
   startAnalysis: (args: StartArgs) => void
   startRecategorize: (args: StartRecategorizeArgs) => void
@@ -60,7 +61,7 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => {
 
     const port = chrome.runtime.connect({ name: ANALYSIS_PORT })
     activePort = port
-    set({ job: { running: true, total, done: 0, ok: 0, failed: 0 } })
+    set({ job: { running: true, total, done: 0, ok: 0, failed: 0 }, error: null })
 
     let buffer: Record<string, StoredAnalysis> = {}
     let scheduled = false
@@ -88,13 +89,17 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => {
           flush()
           set((state) => ({
             job: { ...state.job, running: false, done: workerMessage.total, ok: workerMessage.ok, failed: workerMessage.failed },
+            error:
+              workerMessage.ok === 0 && workerMessage.total > 0
+                ? '0 results — the model returned no usable assignments.'
+                : null,
           }))
           port.disconnect()
           activePort = null
           break
         case 'error':
           flush()
-          set((state) => ({ job: { ...state.job, running: false } }))
+          set((state) => ({ job: { ...state.job, running: false }, error: workerMessage.message }))
           port.disconnect()
           activePort = null
           break
@@ -112,6 +117,7 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => {
   return {
     byUrl: {},
     job: IDLE_JOB,
+    error: null,
 
     loadFromCache: async () => {
       set({ byUrl: await getAllCachedAnalysis() })

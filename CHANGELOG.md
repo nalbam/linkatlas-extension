@@ -37,6 +37,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   AI classification cache, returning the tree to the current Chrome bookmarks'
   original folder structure (behind a confirm; not reversible). Distinct from
   Rollback, which undoes a change already applied to Chrome.
+- **Expand/collapse persists across reloads.** The Tree view's expanded folders
+  and the Organize view's collapsed nodes are saved to `chrome.storage.local`
+  (via `uiStore`) and restored on reload; first-run still auto-expands top-level
+  roots only when nothing was saved. Search/filter/sort stay ephemeral.
 - **AI recategorize (collection-aware).** A new "AI로 재정리" action sends the whole
   collection to the LLM in **one call** and groups similar sites into a small,
   consistent set of categories (~10-15 top-level, a 2nd level only for large
@@ -48,6 +52,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Recategorize / analysis failures (API errors, denied host permission, or a
+  model response with zero usable assignments) are now surfaced in the organize
+  view instead of failing silently — `analysisStore` keeps the error and the
+  "AI로 재정리" area shows it.
 - Drop the deprecated `baseUrl` from `tsconfig.json` (flagged for removal in
   TypeScript 7.0) and make the `@/*` path mapping relative (`./src/*`), keeping
   module resolution unchanged.

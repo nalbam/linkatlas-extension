@@ -23,7 +23,7 @@ evaluated against the quality gates before the next begins.
 - [x] Show favicons and descriptions in the tree rows.
 - [x] On-demand `<all_urls>` host permission via `optional_host_permissions`.
 
-## Phase 3 — AI Analysis Flow ✅ (current)
+## Phase 3 — AI Analysis Flow ✅
 
 - [x] Wire `createProvider` + metadata into an analysis pipeline (background job).
 - [x] Privacy gate with explicit confirmation; scope follows the active filters.
@@ -43,20 +43,39 @@ evaluated against the quality gates before the next begins.
 - [x] Drag-and-drop move of bookmarks (native HTML5) + multi-select "Move to".
 - [x] Immediate local-state updates with undo; persisted to storage.
 
-## Phase 5 — Apply Changes to Chrome ✅ (current)
+## Phase 5 — Apply Changes to Chrome ✅
 
 - [x] Preview the plan (folders to create, bookmarks to move, target) before applying.
-- [x] Apply via Bookmarks API: create container + category folders, move
-      categorized bookmarks (background job).
+- [x] Apply via Bookmarks API: create category folders + move categorized
+      bookmarks (background job). *(Phase 6 drops the container — folders are
+      created directly under the chosen root.)*
 - [x] Post-apply summary (folders created / bookmarks moved).
 - [x] Rollback support (incremental snapshot + restore; complete undo).
 - [ ] Refinements: optional delete-empty-folders (with snapshot-based recreate),
       multi-apply history, rename existing folders, dry-run diff view.
 
-## All MVP success criteria met 🎉
+## Phase 6 — Purpose groups, 大/中/小 hierarchy & collection recategorize ✅
 
-Read bookmarks → analyze with AI → generate categories & tags → reorganize →
-preview → apply to Chrome → rollback. The remaining items above and in
+- [x] Path-based organize model (中/小 path under a 大 root) replacing flat
+      categories; persisted state migrates v1/v2 → v3.
+- [x] **Purpose groups** — the user's own bookmark-bar folders are preserved as-is
+      and skip AI classification; any top-level folder toggles purpose↔category.
+- [x] **大 (browser roots)** — 북마크바 / 기타 북마크 shown read-only at the top, with
+      a 대/중/소 hierarchy under each. Bookmarks and folders move freely, across roots.
+- [x] **Collection-aware recategorize** — the whole collection goes to the LLM in
+      one call → a small, consistent category hierarchy (~8–12 top-level, 2nd level
+      only for large groups). Bookmark bar excluded (managed manually). Errors surfaced.
+- [x] **Reset** (clear edits + AI classification → original folders); expand/collapse
+      state persists across reloads.
+- [x] Apply creates each bookmark's path under its assigned root (no container).
+- [ ] Refinements: tag-based grouping, per-root recategorize, virtualize organize rows.
+
+## All success criteria met 🎉
+
+The core purpose, end-to-end:
+① read Chrome bookmarks → ② fetch each page + analyze the site with an LLM →
+③ the LLM re-clusters the collection into a category hierarchy → ④ edit categories
+→ ⑤ apply to Chrome (with rollback). The unchecked items above and in
 "Technical Debt" are refinements, not gaps in the core flow.
 
 ## Quality Gates — Phase 5 self-assessment
@@ -69,7 +88,7 @@ explicit action.
 | Architecture | 9 | Three SW jobs share one Port/cache/store pattern; apply is a pure planner + reversible worker; consistent layering across all phases. |
 | UX | 8 | Full flow with preview + confirm + summary + rollback. Per-bookmark detail view and a dry-run diff list still pending. |
 | Performance | 8 | Tree virtualized; jobs rate-limited; apply moves are sequential. Organize rows not virtualized; large-set profiling still pending. |
-| Maintainability | 9 | Small focused modules (~4.6k LOC), 62 unit tests; every domain core tested without browser/network. |
+| Maintainability | 9 | Small focused modules, 111 unit tests; every domain core (paths, grouping, recategorize, apply plan, migration) tested without browser/network. |
 | Security | 9 | Keys local-only; host access opt-in; the destructive apply is gated by an explicit preview/confirm and is fully reversible via snapshot. |
 
 ### Actions to maintain/raise scores
@@ -91,18 +110,16 @@ explicit action.
 - Metadata uses background `fetch`, not content scripts, so there is no
   `src/content/`; one would only be needed for in-page extraction of
   JS-rendered pages.
-- Component-level tests (React Testing Library) deferred; current coverage is on
-  pure logic. Add interaction tests when management/DnD (Phase 4) lands.
-- Editable working-tree store intentionally omitted until Phase 4 (would be
-  unused before then).
+- Component/E2E tests (React Testing Library) still deferred; coverage is on pure
+  logic, so the DnD + apply/rollback interactions are unverified by automated tests.
 - Metadata `description`/`keywords` and analysis `summary`/`subcategory`/`reason`
   are surfaced via the row tooltip only; a richer per-bookmark detail view is
   pending.
 - No model selector or custom-category steering in Settings yet; analysis uses
   the provider's default model. Already-analyzed bookmarks can't be re-analyzed
   from the UI without clearing storage.
-- Only the OpenAI provider is wired for analysis; Gemini/Claude are contract-ready
-  but not implemented.
+- Only the OpenAI provider is wired (analyze + recategorize); Gemini/Claude are
+  contract-ready but not implemented.
 - Organize rows are not virtualized; a single very large category renders all its
   rows inside a scroll container.
 - Apply keeps now-empty original folders (deliberate, for clean rollback);

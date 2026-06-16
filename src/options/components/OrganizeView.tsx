@@ -119,6 +119,7 @@ export function OrganizeView({ roots, analysisByUrl, metadataByUrl, onOpen }: Or
   const startRecategorize = useAnalysisStore((s) => s.startRecategorize)
   const clearAnalysis = useAnalysisStore((s) => s.clearAll)
   const analysisJob = useAnalysisStore((s) => s.job)
+  const analysisError = useAnalysisStore((s) => s.error)
 
   const bookmarks = useMemo(() => collectBookmarks(roots), [roots])
   const originalPathByUrl = useMemo(() => collectOriginalPaths(roots), [roots])
@@ -278,6 +279,11 @@ export function OrganizeView({ roots, analysisByUrl, metadataByUrl, onOpen }: Or
           <Icon name="sparkle" size={16} />
           AI로 재정리
         </Button>
+        {analysisError && !analysisJob.running && (
+          <span className="max-w-[40%] truncate text-xs text-rose-300" title={analysisError}>
+            재정리 실패: {analysisError}
+          </span>
+        )}
         <Button
           variant="ghost"
           onClick={() => setResetOpen((open) => !open)}
