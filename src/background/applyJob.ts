@@ -1,5 +1,5 @@
 import { clearSnapshot, getSnapshot, setSnapshot } from '@/apply/snapshot'
-import { type ApplyAssignment, type ApplySnapshot, type ApplyTarget } from '@/apply/types'
+import { type ApplyAssignment, type ApplySnapshot } from '@/apply/types'
 import { type ApplyWorkerMessage } from './messages'
 
 const PERSIST_EVERY = 20
@@ -17,14 +17,38 @@ async function ensureFolder(
 }
 
 /**
- * Apply the category plan to Chrome: create the container + one folder per
- * category, then move each categorized bookmark in. The original position of
- * every moved bookmark (and every created folder id) is recorded to a snapshot —
- * persisted incrementally — so the whole operation can be rolled back.
+ * Ensure a nested folder path exists under `rootId`, creating only the missing
+ * segments. Same-named folders (including the user's existing ones) are reused,
+ * so only newly-created folder ids are recorded to the snapshot — keeping
+ * rollback from ever deleting a folder the user already had.
+ */
+async function ensurePath(
+  rootId: string,
+  path: readonly string[],
+  snapshot: ApplySnapshot,
+  onCreated: () => void,
+): Promise<string> {
+  let parentId = rootId
+  for (const title of path) {
+    const folder = await ensureFolder(parentId, title)
+    if (folder.created) {
+      snapshot.createdFolderIds.push(folder.id)
+      onCreated()
+    }
+    parentId = folder.id
+  }
+  return parentId
+}
+
+/**
+ * Apply the organization plan to Chrome: for each assignment, ensure its nested
+ * folder path directly under the chosen 大 root, then move its bookmarks in. The
+ * original position of every moved bookmark (and every created folder id) is
+ * recorded to a snapshot — persisted incrementally — so the whole operation can
+ * be rolled back.
  */
 export async function runApplyJob(
   assignments: readonly ApplyAssignment[],
-  target: ApplyTarget,
   post: (message: ApplyWorkerMessage) => void,
   signal: AbortSignal,
 ): Promise<void> {
@@ -35,20 +59,12 @@ export async function runApplyJob(
   const persist = () => setSnapshot(snapshot)
 
   try {
-    const container = await ensureFolder(target.parentId, target.container)
-    if (container.created) {
-      created += 1
-      snapshot.createdFolderIds.push(container.id)
-    }
-    await persist()
-
     for (const assignment of assignments) {
       if (signal.aborted) break
-      const folder = await ensureFolder(container.id, assignment.category)
-      if (folder.created) {
+      const folderId = await ensurePath(assignment.rootId, assignment.path, snapshot, () => {
         created += 1
-        snapshot.createdFolderIds.push(folder.id)
-      }
+      })
+      await persist()
 
       for (const id of assignment.bookmarkIds) {
         if (signal.aborted) break
@@ -56,7 +72,7 @@ export async function runApplyJob(
         const node = nodes[0]
         if (!node || node.parentId === undefined || node.index === undefined) continue
         snapshot.moved.push({ id, parentId: node.parentId, index: node.index })
-        await chrome.bookmarks.move(id, { parentId: folder.id })
+        await chrome.bookmarks.move(id, { parentId: folderId })
         moved += 1
         if (moved % PERSIST_EVERY === 0) {
           await persist()
@@ -99,7 +115,7 @@ export async function runRollbackJob(post: (message: ApplyWorkerMessage) => void
       if (restored % PERSIST_EVERY === 0) post({ type: 'progress', total, done: restored })
     }
 
-    // Category folders before the container (reverse of creation order).
+    // Deepest folders first (reverse of creation order) so parents are empty when removed.
     for (const folderId of [...snapshot.createdFolderIds].reverse()) {
       try {
         await chrome.bookmarks.remove(folderId)

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { buildUserPrompt, normalizeAnalysis, parseAnalysisContent } from './prompts'
+import {
+  buildRecategorizeUserPrompt,
+  buildUserPrompt,
+  normalizeAnalysis,
+  parseAnalysisContent,
+  parseRecategorizeContent,
+} from './prompts'
 
 describe('normalizeAnalysis', () => {
   it('clamps importance into 0–10 and rounds', () => {
@@ -49,5 +55,49 @@ describe('buildUserPrompt', () => {
 describe('parseAnalysisContent', () => {
   it('throws a clear error on invalid JSON', () => {
     expect(() => parseAnalysisContent('not json')).toThrow(/not valid JSON/)
+  })
+})
+
+describe('buildRecategorizeUserPrompt', () => {
+  it('numbers each bookmark and includes the target count when given', () => {
+    const prompt = buildRecategorizeUserPrompt(
+      [
+        { title: 'React', domain: 'react.dev' },
+        { title: 'AWS', domain: 'aws.amazon.com', hint: 'cloud console' },
+      ],
+      8,
+    )
+    expect(prompt).toContain('Aim for about 8 top-level categories.')
+    expect(prompt).toContain('0: React — react.dev')
+    expect(prompt).toContain('1: AWS — aws.amazon.com — cloud console')
+  })
+})
+
+describe('parseRecategorizeContent', () => {
+  it('parses assignments and caps path depth at 2', () => {
+    const json = JSON.stringify({
+      assignments: [
+        { index: 0, path: ['Development'] },
+        { index: 1, path: ['Games', 'Minecraft', 'Mods'] },
+      ],
+    })
+    expect(parseRecategorizeContent(json)).toEqual([
+      { index: 0, path: ['Development'] },
+      { index: 1, path: ['Games', 'Minecraft'] },
+    ])
+  })
+
+  it('drops invalid indices and blank segments', () => {
+    const json = JSON.stringify({
+      assignments: [
+        { index: -1, path: ['X'] },
+        { index: 2, path: ['  ', 'Real'] },
+      ],
+    })
+    expect(parseRecategorizeContent(json)).toEqual([{ index: 2, path: ['Real'] }])
+  })
+
+  it('throws on invalid JSON', () => {
+    expect(() => parseRecategorizeContent('nope')).toThrow(/not valid JSON/)
   })
 })

@@ -3,12 +3,15 @@ import {
   collectBookmarkUrls,
   collectDomains,
   collectFolderIds,
+  collectOriginalPaths,
+  collectRootTitleByUrl,
   countTree,
   extractDomain,
   filterByDomain,
   flattenVisible,
   searchTree,
   sortTree,
+  topLevelFolderTitles,
 } from './tree'
 import { type BookmarkNode, type FolderNode, type TreeNode } from './types'
 
@@ -151,5 +154,34 @@ describe('flattenVisible', () => {
   it('treats every folder as expanded with expandAll', () => {
     const flat = flattenVisible(sampleTree(), new Set(), { expandAll: true })
     expect(flat).toHaveLength(5)
+  })
+})
+
+describe('collectOriginalPaths', () => {
+  it('maps each bookmark to its ancestor folders below the root', () => {
+    expect(collectOriginalPaths(sampleTree())).toEqual({
+      'https://react.dev/learn': ['Dev'],
+      'https://aws.amazon.com/console': ['Dev'],
+      'https://news.ycombinator.com': [],
+    })
+  })
+})
+
+describe('topLevelFolderTitles', () => {
+  it('returns the child folder titles of one root', () => {
+    expect(topLevelFolderTitles(sampleTree()[0])).toEqual(['Dev'])
+  })
+  it('returns empty for undefined or a bookmark node', () => {
+    expect(topLevelFolderTitles(undefined)).toEqual([])
+  })
+})
+
+describe('collectRootTitleByUrl', () => {
+  it('maps each bookmark to its top-level root title', () => {
+    expect(collectRootTitleByUrl(sampleTree())).toEqual({
+      'https://react.dev/learn': 'Bookmarks Bar',
+      'https://aws.amazon.com/console': 'Bookmarks Bar',
+      'https://news.ycombinator.com': 'Bookmarks Bar',
+    })
   })
 })

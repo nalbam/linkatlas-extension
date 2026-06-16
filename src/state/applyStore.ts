@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { getSnapshot } from '@/apply/snapshot'
-import { type ApplyAssignment, type ApplySummary, type ApplyTarget } from '@/apply/types'
+import { type ApplyAssignment, type ApplySummary } from '@/apply/types'
 import {
   APPLY_PORT,
   type ApplyClientMessage,
@@ -21,7 +21,7 @@ interface ApplyState {
   lastSummary: ApplySummary | null
   hasSnapshot: boolean
   error: string | null
-  startApply: (args: { assignments: ApplyAssignment[]; target: ApplyTarget }) => void
+  startApply: (args: { assignments: ApplyAssignment[] }) => void
   rollback: () => void
   refreshSnapshotFlag: () => Promise<void>
 }
@@ -75,7 +75,7 @@ export const useApplyStore = create<ApplyState>((set, get) => {
     hasSnapshot: false,
     error: null,
 
-    startApply: ({ assignments, target }) => run({ type: 'apply', assignments, target }, 'apply'),
+    startApply: ({ assignments }) => run({ type: 'apply', assignments }, 'apply'),
     rollback: () => run({ type: 'rollback' }, 'rollback'),
     refreshSnapshotFlag: async () => {
       set({ hasSnapshot: (await getSnapshot()) !== null })

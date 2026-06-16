@@ -1,65 +1,120 @@
 import { type DragEvent, useState } from 'react'
-import { type CategoryGroup } from '@/organize/types'
 import { type BookmarkMetadata } from '@/metadata/types'
+import { type Path, UNCATEGORIZED, hasPrefix, pathKey } from '@/organize/path'
+import { type PathTreeNode } from '@/organize/types'
 import { Button } from '@/ui/components/Button'
 import { Favicon } from '@/ui/components/Favicon'
 import { Icon } from '@/ui/components/Icon'
 
-const DRAG_MIME = 'application/x-linkatlas-urls'
+export const DRAG_MIME = 'application/x-linkatlas-urls'
 
-interface CategorySectionProps {
-  group: CategoryGroup
-  otherCategories: string[]
-  metadataByUrl: Record<string, BookmarkMetadata>
-  selectedUrls: Set<string>
-  editable: boolean
-  onToggleSelect: (url: string) => void
-  onOpen: (url: string) => void
-  onDropUrls: (urls: string[]) => void
-  onRename: (to: string) => void
-  onMerge: (into: string) => void
-  onDelete: () => void
+/** A move/merge destination carrying BOTH the 大 root and the 中/小 path. */
+export interface MoveTarget {
+  key: string
+  label: string
+  rootId: string
+  path: Path
 }
 
-export function CategorySection({
-  group,
-  otherCategories,
+/** Drag payload — bookmarks (url list) or a folder subtree (source 大 + path). */
+export interface DragPayload {
+  kind: 'bookmarks' | 'folder'
+  urls?: string[]
+  fromRootId?: string
+  fromPath?: Path
+}
+
+interface PathNodeSectionProps {
+  node: PathTreeNode
+  rootId: string
+  depth: number
+  moveTargets: MoveTarget[]
+  metadataByUrl: Record<string, BookmarkMetadata>
+  selectedUrls: Set<string>
+  onToggleSelect: (url: string) => void
+  onOpen: (url: string) => void
+  onMoveUrls: (urls: string[], toRootId: string, toPath: Path) => void
+  onMoveFolder: (fromRootId: string, fromPath: Path, toRootId: string, toPath: Path) => void
+  onRename: (node: PathTreeNode, draft: string) => void
+  onMerge: (node: PathTreeNode, into: Path) => void
+  onDelete: (node: PathTreeNode) => void
+  onTogglePurpose: (segment: string) => void
+}
+
+function countSubtree(node: PathTreeNode): number {
+  return node.bookmarks.length + node.children.reduce((sum, child) => sum + countSubtree(child), 0)
+}
+
+function parsePayload(event: DragEvent): DragPayload | null {
+  const raw = event.dataTransfer.getData(DRAG_MIME)
+  if (!raw) return null
+  try {
+    return JSON.parse(raw) as DragPayload
+  } catch {
+    return null
+  }
+}
+
+export function PathNodeSection({
+  node,
+  rootId,
+  depth,
+  moveTargets,
   metadataByUrl,
   selectedUrls,
-  editable,
   onToggleSelect,
   onOpen,
-  onDropUrls,
+  onMoveUrls,
+  onMoveFolder,
   onRename,
   onMerge,
   onDelete,
-}: CategorySectionProps) {
+  onTogglePurpose,
+}: PathNodeSectionProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [renaming, setRenaming] = useState(false)
-  const [draftName, setDraftName] = useState(group.category)
+  const [draft, setDraft] = useState(node.segment)
   const [dragOver, setDragOver] = useState(false)
+
+  const isUncategorized = node.path[0] === UNCATEGORIZED
+  const editable = !isUncategorized
+  const isTopLevel = node.path.length === 1
+  const total = countSubtree(node)
+
+  // Merge only within the same 大; exclude self + descendants.
+  const mergeTargets = moveTargets.filter((t) => t.rootId === rootId && !hasPrefix(t.path, node.path))
 
   const handleDrop = (event: DragEvent) => {
     event.preventDefault()
+    event.stopPropagation()
     setDragOver(false)
-    const raw = event.dataTransfer.getData(DRAG_MIME)
-    if (!raw) return
-    try {
-      const urls = JSON.parse(raw) as string[]
-      onDropUrls(urls)
-    } catch {
-      /* ignore malformed payload */
+    const payload = parsePayload(event)
+    if (!payload) return
+    if (payload.kind === 'folder' && payload.fromRootId !== undefined && payload.fromPath) {
+      // Reject dropping a folder onto itself or its own descendant in the same 大.
+      if (payload.fromRootId === rootId && hasPrefix(node.path, payload.fromPath)) return
+      onMoveFolder(payload.fromRootId, payload.fromPath, rootId, node.path)
+    } else if (payload.urls) {
+      onMoveUrls(payload.urls, rootId, node.path)
     }
   }
 
-  const startDrag = (event: DragEvent, url: string) => {
+  const startBookmarkDrag = (event: DragEvent, url: string) => {
     const urls = selectedUrls.has(url) && selectedUrls.size > 0 ? [...selectedUrls] : [url]
-    event.dataTransfer.setData(DRAG_MIME, JSON.stringify(urls))
+    const payload: DragPayload = { kind: 'bookmarks', urls }
+    event.dataTransfer.setData(DRAG_MIME, JSON.stringify(payload))
+    event.dataTransfer.effectAllowed = 'move'
+  }
+
+  const startFolderDrag = (event: DragEvent) => {
+    event.stopPropagation()
+    const payload: DragPayload = { kind: 'folder', fromRootId: rootId, fromPath: node.path }
+    event.dataTransfer.setData(DRAG_MIME, JSON.stringify(payload))
     event.dataTransfer.effectAllowed = 'move'
   }
 
   const commitRename = () => {
-    if (draftName.trim() && draftName.trim() !== group.category) onRename(draftName.trim())
+    if (draft.trim() && draft.trim() !== node.segment) onRename(node, draft.trim())
     setRenaming(false)
   }
 
@@ -67,13 +122,21 @@ export function CategorySection({
     <section
       onDragOver={(event) => {
         event.preventDefault()
+        event.stopPropagation()
         setDragOver(true)
       }}
-      onDragLeave={() => setDragOver(false)}
+      onDragLeave={(event) => {
+        event.stopPropagation()
+        setDragOver(false)
+      }}
       onDrop={handleDrop}
       className={`rounded-lg border ${dragOver ? 'border-accent bg-accent/10' : 'border-border bg-surface'}`}
     >
-      <header className="flex items-center gap-2 px-3 py-2">
+      <header
+        draggable={editable && !renaming}
+        onDragStart={editable && !renaming ? startFolderDrag : undefined}
+        className="flex items-center gap-2 px-3 py-2"
+      >
         <button
           type="button"
           onClick={() => setCollapsed((c) => !c)}
@@ -83,11 +146,23 @@ export function CategorySection({
           <Icon name="chevron" size={14} />
         </button>
 
+        {!isUncategorized && (
+          <span
+            className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${
+              node.origin === 'purpose'
+                ? 'bg-accent/20 text-accent'
+                : 'bg-surface-raised text-muted'
+            }`}
+          >
+            {node.origin === 'purpose' ? '목적' : '분류'}
+          </span>
+        )}
+
         {renaming ? (
           <input
             autoFocus
-            value={draftName}
-            onChange={(event) => setDraftName(event.target.value)}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
             onBlur={commitRename}
             onKeyDown={(event) => {
               if (event.key === 'Enter') commitRename()
@@ -96,38 +171,50 @@ export function CategorySection({
             className="rounded border border-border bg-canvas px-2 py-0.5 text-sm text-slate-100 focus:border-accent focus:outline-none"
           />
         ) : (
-          <h3 className="truncate text-sm font-semibold text-slate-100">{group.category}</h3>
+          <h3 className="truncate text-sm font-semibold text-slate-100">{node.segment}</h3>
         )}
-        <span className="text-xs text-muted">{group.bookmarks.length}</span>
+        <span className="text-xs text-muted">{total}</span>
 
         {editable && !renaming && (
           <div className="ml-auto flex items-center gap-1">
+            {isTopLevel && (
+              <Button
+                variant="ghost"
+                onClick={() => onTogglePurpose(node.segment)}
+                title={node.origin === 'purpose' ? 'Treat as category (use AI)' : 'Treat as purpose group'}
+              >
+                <Icon name={node.origin === 'purpose' ? 'folder' : 'tag'} size={15} />
+              </Button>
+            )}
             <Button
               variant="ghost"
               onClick={() => {
-                setDraftName(group.category)
+                setDraft(node.segment)
                 setRenaming(true)
               }}
               title="Rename"
             >
               <Icon name="edit" size={15} />
             </Button>
-            {otherCategories.length > 0 && (
+            {mergeTargets.length > 0 && (
               <select
                 value=""
-                onChange={(event) => event.target.value && onMerge(event.target.value)}
+                onChange={(event) => {
+                  const target = mergeTargets.find((t) => t.key === event.target.value)
+                  if (target) onMerge(node, target.path)
+                }}
                 title="Merge into…"
-                className="rounded-md border border-border bg-surface px-1.5 py-1 text-xs text-muted focus:border-accent focus:outline-none"
+                className="max-w-[8rem] rounded-md border border-border bg-surface px-1.5 py-1 text-xs text-muted focus:border-accent focus:outline-none"
               >
                 <option value="">Merge into…</option>
-                {otherCategories.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
+                {mergeTargets.map((target) => (
+                  <option key={target.key} value={target.key}>
+                    {target.label}
                   </option>
                 ))}
               </select>
             )}
-            <Button variant="ghost" onClick={onDelete} title="Delete (reassign to Uncategorized)">
+            <Button variant="ghost" onClick={() => onDelete(node)} title="Delete (reassign to Uncategorized)">
               <Icon name="trash" size={15} />
             </Button>
           </div>
@@ -135,44 +222,72 @@ export function CategorySection({
       </header>
 
       {!collapsed && (
-        <ul className="max-h-80 overflow-auto border-t border-border">
-          {group.bookmarks.length === 0 ? (
-            <li className="px-3 py-3 text-xs text-muted">Empty — drag bookmarks here.</li>
-          ) : (
-            group.bookmarks.map((bookmark) => {
-              const selected = selectedUrls.has(bookmark.url)
-              return (
-                <li
-                  key={bookmark.id}
-                  draggable
-                  onDragStart={(event) => startDrag(event, bookmark.url)}
-                  className={`flex items-center gap-2 px-3 py-1.5 ${selected ? 'bg-accent/10' : 'hover:bg-surface-raised'}`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selected}
-                    onChange={() => onToggleSelect(bookmark.url)}
-                    className="shrink-0 accent-accent"
-                  />
-                  <Favicon src={metadataByUrl[bookmark.url]?.faviconUrl} />
-                  <button
-                    type="button"
-                    onClick={() => onOpen(bookmark.url)}
-                    title={bookmark.url}
-                    className="min-w-0 flex-1 truncate text-left text-sm text-slate-200"
+        <div className="border-t border-border">
+          {node.bookmarks.length > 0 && (
+            <ul className="max-h-80 overflow-auto">
+              {node.bookmarks.map((bookmark) => {
+                const selected = selectedUrls.has(bookmark.url)
+                return (
+                  <li
+                    key={bookmark.id}
+                    draggable
+                    onDragStart={(event) => startBookmarkDrag(event, bookmark.url)}
+                    className={`flex items-center gap-2 px-3 py-1.5 ${selected ? 'bg-accent/10' : 'hover:bg-surface-raised'}`}
                   >
-                    {bookmark.title || bookmark.url}
-                  </button>
-                  {bookmark.domain && (
-                    <span className="max-w-[35%] shrink-0 truncate text-xs text-muted">
-                      {bookmark.domain}
-                    </span>
-                  )}
-                </li>
-              )
-            })
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onChange={() => onToggleSelect(bookmark.url)}
+                      className="shrink-0 accent-accent"
+                    />
+                    <Favicon src={metadataByUrl[bookmark.url]?.faviconUrl} />
+                    <button
+                      type="button"
+                      onClick={() => onOpen(bookmark.url)}
+                      title={bookmark.url}
+                      className="min-w-0 flex-1 truncate text-left text-sm text-slate-200"
+                    >
+                      {bookmark.title || bookmark.url}
+                    </button>
+                    {bookmark.domain && (
+                      <span className="max-w-[35%] shrink-0 truncate text-xs text-muted">
+                        {bookmark.domain}
+                      </span>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
           )}
-        </ul>
+
+          {node.children.length > 0 && (
+            <div className="space-y-2 p-2 pl-4">
+              {node.children.map((child) => (
+                <PathNodeSection
+                  key={pathKey(child.path)}
+                  node={child}
+                  rootId={rootId}
+                  depth={depth + 1}
+                  moveTargets={moveTargets}
+                  metadataByUrl={metadataByUrl}
+                  selectedUrls={selectedUrls}
+                  onToggleSelect={onToggleSelect}
+                  onOpen={onOpen}
+                  onMoveUrls={onMoveUrls}
+                  onMoveFolder={onMoveFolder}
+                  onRename={onRename}
+                  onMerge={onMerge}
+                  onDelete={onDelete}
+                  onTogglePurpose={onTogglePurpose}
+                />
+              ))}
+            </div>
+          )}
+
+          {node.bookmarks.length === 0 && node.children.length === 0 && (
+            <p className="px-3 py-3 text-xs text-muted">Empty — drag bookmarks here.</p>
+          )}
+        </div>
       )}
     </section>
   )

@@ -1,6 +1,6 @@
 import { type AnalyzeItem, type StoredAnalysis } from '@/analysis/types'
-import { type ProviderId } from '@/ai/types'
-import { type ApplyAssignment, type ApplySummary, type ApplyTarget } from '@/apply/types'
+import { type ProviderId, type RecategorizeInput } from '@/ai/types'
+import { type ApplyAssignment, type ApplySummary } from '@/apply/types'
 import { type BookmarkMetadata } from '@/metadata/types'
 
 /**
@@ -25,6 +25,15 @@ export const ANALYSIS_PORT = 'linkatlas-analysis'
 
 export type AnalysisClientMessage =
   | { type: 'analyze'; provider: ProviderId; apiKey: string; model?: string; items: AnalyzeItem[] }
+  | {
+      type: 'recategorize'
+      provider: ProviderId
+      apiKey: string
+      model?: string
+      inputs: RecategorizeInput[]
+      urlByIndex: string[]
+      targetCount?: number
+    }
   | { type: 'cancel' }
 
 export type AnalysisWorkerMessage =
@@ -36,7 +45,7 @@ export type AnalysisWorkerMessage =
 export const APPLY_PORT = 'linkatlas-apply'
 
 export type ApplyClientMessage =
-  | { type: 'apply'; assignments: ApplyAssignment[]; target: ApplyTarget }
+  | { type: 'apply'; assignments: ApplyAssignment[] }
   | { type: 'rollback' }
   | { type: 'cancel' }
 

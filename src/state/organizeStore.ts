@@ -1,27 +1,35 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
+import { migrateOrganize } from '@/organize/migrate'
 import * as ops from '@/organize/operations'
+import { type Path } from '@/organize/path'
 import { type OrganizeState } from '@/organize/types'
 import { chromeStorageAdapter } from '@/utils/chromeStorage'
 
 const HISTORY_LIMIT = 50
 
 /**
- * The category-management working state plus an in-session undo history. Only
+ * The path-based organize working state plus an in-session undo history. Only
  * the current `organize` state is persisted (history is ephemeral). Actions
  * delegate to the pure reducers in `organize/operations`; callers pass the
- * affected URLs (computed from the rendered grouping) so the reducers stay pure.
+ * affected placements (computed from the rendered grouping) so the reducers stay
+ * pure. `seedPurposeRoots` runs once after migration to auto-detect purpose
+ * groups from the bookmark bar.
  */
 interface OrganizeStore {
   organize: OrganizeState
   history: OrganizeState[]
   hasHydrated: boolean
 
-  createCategory: (name: string) => void
-  moveBookmarks: (urls: string[], to: string) => void
-  renameCategory: (from: string, to: string, urls: string[]) => void
-  mergeCategories: (sources: string[], to: string, urls: string[]) => void
-  deleteCategory: (name: string, urls: string[], reassignTo?: string) => void
+  createPath: (path: Path) => void
+  moveBookmarks: (urls: string[], to: Path) => void
+  moveBookmarksToRoot: (urls: string[], toRootTitle: string, toPath: Path) => void
+  moveSubtreeToRoot: (from: Path, toRootTitle: string, toPath: Path, affected: ops.RootPlacement[]) => void
+  renamePath: (from: Path, to: Path, affected: ops.Placement[]) => void
+  mergePaths: (sources: Path[], to: Path, affected: ops.Placement[]) => void
+  deletePath: (path: Path, affected: ops.Placement[]) => void
+  togglePurposeRoot: (segment: string) => void
+  seedPurposeRoots: (segments: string[]) => void
   undo: () => void
   reset: () => void
 }
@@ -42,13 +50,23 @@ export const useOrganizeStore = create<OrganizeStore>()(
         history: [],
         hasHydrated: false,
 
-        createCategory: (name) => apply((s) => ops.createCategory(s, name)),
+        createPath: (path) => apply((s) => ops.createPath(s, path)),
         moveBookmarks: (urls, to) => apply((s) => ops.moveBookmarks(s, urls, to)),
-        renameCategory: (from, to, urls) => apply((s) => ops.renameCategory(s, from, to, urls)),
-        mergeCategories: (sources, to, urls) =>
-          apply((s) => ops.mergeCategories(s, sources, to, urls)),
-        deleteCategory: (name, urls, reassignTo) =>
-          apply((s) => ops.deleteCategory(s, name, urls, reassignTo)),
+        moveBookmarksToRoot: (urls, toRootTitle, toPath) =>
+          apply((s) => ops.moveBookmarksToRoot(s, urls, toRootTitle, toPath)),
+        moveSubtreeToRoot: (from, toRootTitle, toPath, affected) =>
+          apply((s) => ops.moveSubtreeToRoot(s, from, toRootTitle, toPath, affected)),
+        renamePath: (from, to, affected) => apply((s) => ops.renamePath(s, from, to, affected)),
+        mergePaths: (sources, to, affected) => apply((s) => ops.mergePaths(s, sources, to, affected)),
+        deletePath: (path, affected) => apply((s) => ops.deletePath(s, path, affected)),
+        togglePurposeRoot: (segment) => apply((s) => ops.togglePurposeRoot(s, segment)),
+
+        // Seeds purpose roots once (when none are set yet) — not an undoable edit.
+        seedPurposeRoots: (segments) =>
+          set((store) => {
+            if (store.organize.purposeRoots.length > 0 || segments.length === 0) return {}
+            return { organize: { ...store.organize, purposeRoots: [...segments] } }
+          }),
 
         undo: () =>
           set((store) => {
@@ -61,7 +79,12 @@ export const useOrganizeStore = create<OrganizeStore>()(
     },
     {
       name: 'linkatlas-organize',
+      version: 3,
       storage: createJSONStorage(() => chromeStorageAdapter),
+      migrate: (persisted) => {
+        const prev = persisted as { organize?: unknown } | undefined
+        return { organize: migrateOrganize(prev?.organize) } as Partial<OrganizeStore>
+      },
       partialize: ({ organize }) => ({ organize }),
       onRehydrateStorage: () => (state) => {
         if (state) state.hasHydrated = true

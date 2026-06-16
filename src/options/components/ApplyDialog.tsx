@@ -1,38 +1,29 @@
-import { useState } from 'react'
-import { type ApplyPlan, type ApplyTarget } from '@/apply/types'
+import { type ApplyPlan } from '@/apply/types'
 import { Button } from '@/ui/components/Button'
 import { Icon } from '@/ui/components/Icon'
-
-interface TargetOption {
-  id: string
-  title: string
-}
 
 interface ApplyDialogProps {
   open: boolean
   onClose: () => void
   plan: ApplyPlan
-  targets: TargetOption[]
-  onConfirm: (target: ApplyTarget) => void
+  onConfirm: () => void
 }
 
 /**
  * Preview + confirm gate for the destructive apply. Nothing changes in Chrome
- * until the user reviews the plan (folders to create, bookmarks to move, target)
- * and confirms. Reassures the user that the change is reversible.
+ * until the user reviews the plan and confirms. Each bookmark's folder path is
+ * created directly under its assigned 大 root (bookmark bar / other); existing
+ * same-named folders are reused and rollback removes only the folders this apply
+ * created.
  */
-export function ApplyDialog({ open, onClose, plan, targets, onConfirm }: ApplyDialogProps) {
-  const [parentId, setParentId] = useState('')
-  const [container, setContainer] = useState('LinkAtlas')
-
+export function ApplyDialog({ open, onClose, plan, onConfirm }: ApplyDialogProps) {
   if (!open) return null
 
-  const effectiveParent = targets.some((t) => t.id === parentId) ? parentId : (targets[0]?.id ?? '')
-  const canApply = plan.bookmarksToMove > 0 && effectiveParent !== '' && container.trim() !== ''
+  const canApply = plan.bookmarksToMove > 0
 
   const handleConfirm = () => {
     if (!canApply) return
-    onConfirm({ parentId: effectiveParent, container: container.trim() })
+    onConfirm()
     onClose()
   }
 
@@ -52,42 +43,15 @@ export function ApplyDialog({ open, onClose, plan, targets, onConfirm }: ApplyDi
           </header>
 
           <div className="space-y-3 px-5 py-5 text-sm">
-            <Row label="Categories" value={plan.assignments.length.toLocaleString()} />
+            <Row label="Groups" value={plan.assignments.length.toLocaleString()} />
             <Row label="Folders to create" value={`up to ${plan.foldersToCreate.toLocaleString()}`} />
             <Row label="Bookmarks to move" value={plan.bookmarksToMove.toLocaleString()} />
 
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted">
-                Create under
-              </span>
-              <select
-                value={effectiveParent}
-                onChange={(event) => setParentId(event.target.value)}
-                className="w-full rounded-md border border-border bg-canvas px-3 py-2 text-sm text-slate-100 focus:border-accent focus:outline-none"
-              >
-                {targets.map((target) => (
-                  <option key={target.id} value={target.id}>
-                    {target.title}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted">
-                Container folder
-              </span>
-              <input
-                value={container}
-                onChange={(event) => setContainer(event.target.value)}
-                className="w-full rounded-md border border-border bg-canvas px-3 py-2 text-sm text-slate-100 focus:border-accent focus:outline-none"
-              />
-            </label>
-
             <p className="rounded-md border border-border bg-surface-raised px-3 py-2 text-xs leading-relaxed text-muted">
-              Categorized bookmarks are moved into <strong>{container || 'the container'}</strong> →
-              category folders. Uncategorized bookmarks stay put, and original folders are kept. This
-              is reversible — use <strong>Rollback</strong> afterwards to undo.
+              Each bookmark's folder path is created under its assigned root
+              (북마크바 / 기타 북마크), nested by path. Existing same-named folders are reused;
+              Uncategorized bookmarks stay put. This is reversible — use <strong>Rollback</strong>
+              afterwards, which removes only the folders this apply created.
             </p>
           </div>
 

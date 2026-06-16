@@ -8,6 +8,7 @@
 
 import { runAnalysisJob } from './analysisJob'
 import { runApplyJob, runRollbackJob } from './applyJob'
+import { runRecategorizeJob } from './recategorizeJob'
 import {
   ANALYSIS_PORT,
   APPLY_PORT,
@@ -66,6 +67,24 @@ function handleAnalysisPort(port: chrome.runtime.Port) {
       } catch (error) {
         safePost(port, { type: 'error', message: (error as Error).message })
       }
+    } else if (message.type === 'recategorize') {
+      if (started) return
+      started = true
+      const model = message.model ?? ''
+      try {
+        const provider = createProvider(message.provider, message.apiKey, { model: message.model })
+        void runRecategorizeJob(
+          message.inputs,
+          message.urlByIndex,
+          provider,
+          model,
+          message.targetCount,
+          (workerMessage) => safePost(port, workerMessage),
+          controller.signal,
+        )
+      } catch (error) {
+        safePost(port, { type: 'error', message: (error as Error).message })
+      }
     } else if (message.type === 'cancel') {
       controller.abort()
     }
@@ -83,7 +102,6 @@ function handleApplyPort(port: chrome.runtime.Port) {
       started = true
       void runApplyJob(
         message.assignments,
-        message.target,
         (workerMessage) => safePost(port, workerMessage),
         controller.signal,
       )

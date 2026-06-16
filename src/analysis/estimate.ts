@@ -1,5 +1,10 @@
-import { SYSTEM_PROMPT, buildUserPrompt } from '@/ai/prompts'
-import { type AnalyzeInput } from '@/ai/types'
+import {
+  RECATEGORIZE_SYSTEM_PROMPT,
+  SYSTEM_PROMPT,
+  buildRecategorizeUserPrompt,
+  buildUserPrompt,
+} from '@/ai/prompts'
+import { type AnalyzeInput, type RecategorizeInput } from '@/ai/types'
 
 /**
  * Rough pre-send usage estimate so the user sees a token/cost figure before any
@@ -35,6 +40,26 @@ export function estimateUsage(inputs: readonly AnalyzeInput[]): UsageEstimate {
     inputTokens += systemTokens + estimateTokens(buildUserPrompt(input))
   }
   const outputTokens = inputs.length * OUTPUT_TOKENS_PER_ITEM
+  const approxUsd =
+    (inputTokens / 1000) * APPROX_USD_PER_1K_INPUT +
+    (outputTokens / 1000) * APPROX_USD_PER_1K_OUTPUT
+  return {
+    bookmarks: inputs.length,
+    inputTokens,
+    outputTokens,
+    totalTokens: inputTokens + outputTokens,
+    approxUsd,
+  }
+}
+
+// Recategorization is a single call: one prompt for the whole list + a short
+// assignment per bookmark.
+const OUTPUT_TOKENS_PER_ASSIGNMENT = 12
+
+export function estimateRecategorize(inputs: readonly RecategorizeInput[]): UsageEstimate {
+  const prompt = `${RECATEGORIZE_SYSTEM_PROMPT}\n${buildRecategorizeUserPrompt(inputs)}`
+  const inputTokens = estimateTokens(prompt)
+  const outputTokens = inputs.length * OUTPUT_TOKENS_PER_ASSIGNMENT
   const approxUsd =
     (inputTokens / 1000) * APPROX_USD_PER_1K_INPUT +
     (outputTokens / 1000) * APPROX_USD_PER_1K_OUTPUT

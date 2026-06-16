@@ -104,6 +104,53 @@ export function collectFolderIds(roots: readonly TreeNode[]): BookmarkId[] {
   return ids
 }
 
+/**
+ * Map each bookmark url to its ancestor folder titles *below* the 大 root —
+ * the root's own title is excluded, so a bookmark at `bookmark_bar/karrot/pay/x`
+ * yields `['karrot','pay']` and a loose `bookmark_bar/x` yields `[]`. First
+ * occurrence wins (matches {@link collectBookmarkUrls}). Used to preserve the
+ * user's existing purpose folders when organizing.
+ */
+export function collectOriginalPaths(roots: readonly TreeNode[]): Record<string, string[]> {
+  const out: Record<string, string[]> = {}
+  const walk = (nodes: readonly TreeNode[], trail: string[]) => {
+    for (const node of nodes) {
+      if (isFolder(node)) walk(node.children, [...trail, node.title])
+      else if (!(node.url in out)) out[node.url] = trail
+    }
+  }
+  for (const root of roots) {
+    if (isFolder(root)) walk(root.children, [])
+  }
+  return out
+}
+
+/** Child folder titles of one root — used to seed purpose roots from the bar. */
+export function topLevelFolderTitles(root: TreeNode | undefined): string[] {
+  if (!root || !isFolder(root)) return []
+  return root.children.filter(isFolder).map((folder) => folder.title)
+}
+
+/**
+ * Map each bookmark url to its top-level 大 root title (the root it lives under).
+ * First occurrence wins. Pairs with {@link collectOriginalPaths} (which excludes
+ * the 大) so organize can render and apply per browser root.
+ */
+export function collectRootTitleByUrl(roots: readonly TreeNode[]): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const root of roots) {
+    if (!isFolder(root)) continue
+    const walk = (nodes: readonly TreeNode[]) => {
+      for (const node of nodes) {
+        if (isFolder(node)) walk(node.children)
+        else if (!(node.url in out)) out[node.url] = root.title
+      }
+    }
+    walk(root.children)
+  }
+  return out
+}
+
 export interface FilterMatchers {
   /** Keep a bookmark leaf when this returns true. */
   matchBookmark: (node: BookmarkNode) => boolean

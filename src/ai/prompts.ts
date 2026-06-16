@@ -1,4 +1,9 @@
-import { type AnalyzeInput, type BookmarkAnalysis } from './types'
+import {
+  type AnalyzeInput,
+  type BookmarkAnalysis,
+  type RecategorizeAssignment,
+  type RecategorizeInput,
+} from './types'
 
 /**
  * Prompt + schema + response normalization for bookmark analysis. Kept separate
@@ -96,4 +101,97 @@ export function parseAnalysisContent(content: string): BookmarkAnalysis {
     throw new Error('AI response was not valid JSON')
   }
   return normalizeAnalysis(parsed)
+}
+
+// ---------------------------------------------------------------------------
+// Collection-wide recategorization — looks at the whole list in one call and
+// groups similar sites into a small, consistent set of categories.
+// ---------------------------------------------------------------------------
+
+export const RECATEGORIZE_SYSTEM_PROMPT = `You are LinkAtlas, organizing a whole bookmark collection at once.
+You receive a numbered list of bookmarks (title — domain, optional hint).
+Group them by the NATURE of each site into a SMALL, consistent set of BROAD categories.
+Rules — bias hard toward FEWER categories:
+- Use as few top-level categories as possible — about 8-12 total, even for hundreds of bookmarks. Fewer is much better than more.
+- Strongly prefer an existing broad category over inventing a new niche one. NEVER create a category holding only 1-2 bookmarks — fold those into a broader related category (or a general "Other").
+- Reuse ONE consistent label across similar sites (always "Development", never a mix of "Dev"/"Programming"/"Coding").
+- Keep almost everything at a SINGLE level. Add a second level ONLY when one category clearly holds many items (roughly 15+); otherwise always use one level — ["Development"], not ["Development","Frontend"].
+- Base the grouping only on the given signals; never invent facts about a page.
+Return an assignment for EVERY input index.`
+
+/** JSON Schema for the recategorization response (strict mode). */
+export const RECATEGORIZE_JSON_SCHEMA = {
+  name: 'bookmark_recategorization',
+  strict: true,
+  schema: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      assignments: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            index: { type: 'integer' },
+            path: { type: 'array', items: { type: 'string' } },
+          },
+          required: ['index', 'path'],
+        },
+      },
+    },
+    required: ['assignments'],
+  },
+} as const
+
+export function buildRecategorizeUserPrompt(
+  inputs: readonly RecategorizeInput[],
+  targetCount?: number,
+): string {
+  const lines: string[] = []
+  if (targetCount && targetCount > 0) {
+    lines.push(`Aim for about ${targetCount} top-level categories.`)
+  }
+  lines.push('Bookmarks:')
+  inputs.forEach((input, index) => {
+    const parts = [`${input.title || '(untitled)'} — ${input.domain || '(unknown)'}`]
+    if (input.hint) parts.push(input.hint)
+    lines.push(`${index}: ${parts.join(' — ')}`)
+  })
+  return lines.join('\n')
+}
+
+/** Trim/dedupe a raw path, capping depth at 2 segments (中/小). */
+function normalizeRecategorizePath(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  const segments: string[] = []
+  for (const raw of value) {
+    if (typeof raw !== 'string') continue
+    const segment = raw.trim()
+    if (!segment) continue
+    segments.push(segment)
+    if (segments.length >= 2) break
+  }
+  return segments
+}
+
+/** Parse a recategorization response into validated assignments. */
+export function parseRecategorizeContent(content: string): RecategorizeAssignment[] {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(content)
+  } catch {
+    throw new Error('AI response was not valid JSON')
+  }
+  const raw = (parsed as { assignments?: unknown })?.assignments
+  if (!Array.isArray(raw)) return []
+  const out: RecategorizeAssignment[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const obj = item as Record<string, unknown>
+    const index = typeof obj.index === 'number' ? obj.index : Number(obj.index)
+    if (!Number.isInteger(index) || index < 0) continue
+    out.push({ index, path: normalizeRecategorizePath(obj.path) })
+  }
+  return out
 }

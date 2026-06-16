@@ -6,6 +6,42 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Purpose groups + multi-depth categories.** Organize now models each
+  bookmark's placement as a folder **path** (大 root / 中 / 小, variable depth)
+  instead of a single flat category:
+  - **Purpose groups** — the user's own top-level folders under the bookmark bar
+    (e.g. `karrot`, `nalbam`) are auto-detected and preserved as-is, ignoring AI
+    category. Toggle any top-level folder between purpose and category in the UI.
+  - **Category groups** — everything else is classified by AI; `category` +
+    `subcategory` are interpreted as a `[中, 小]` path (existing analyses reused,
+    no re-analysis needed). Unclassified bookmarks fall back to their original
+    folder path until analyzed.
+  - The organize view renders a **nested tree** with purpose/category origin
+    chips; drag-and-drop, multi-select move, rename, and merge all target paths.
+  - **Apply** creates nested folders directly under the chosen root (no more
+    `LinkAtlas` container). Existing same-named folders are reused; rollback
+    removes only the folders this apply created, so your existing folders are
+    never deleted.
+  - Persisted organize state is migrated from the v1 flat-category shape
+    automatically (`'Dev'` → `['Dev']`).
+- **大 (browser root) level in the organize tree.** The tree now shows the
+  browser roots (북마크바 / 기타 북마크 / 모바일 북마크) as **read-only** top-level
+  nodes, with the 中/小 category tree under each — the full 대/중/소 hierarchy.
+  Bookmarks and folders can be dragged freely, **including between roots**; a
+  bookmark keeps its original 大 until moved. Apply now creates each bookmark's
+  path under its assigned root (the single "Create under" picker is gone).
+  Persisted state migrates v1/v2 → v3 (adds an empty root-override map).
+- **AI recategorize (collection-aware).** A new "AI로 재정리" action sends the whole
+  collection to the LLM in **one call** and groups similar sites into a small,
+  consistent set of categories (~10-15 top-level, a 2nd level only for large
+  groups) — fixing the per-bookmark analysis's inconsistent, over-split labels.
+  Purpose groups are excluded; results update each bookmark's AI
+  category/subcategory (preserving summary/importance) and flow straight into the
+  organize tree for preview + Apply. A scope + approximate-cost gate shows before
+  anything is sent.
+
 ### Fixed
 
 - Drop the deprecated `baseUrl` from `tsconfig.json` (flagged for removal in

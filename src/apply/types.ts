@@ -5,8 +5,11 @@
  */
 
 export interface ApplyAssignment {
-  category: string
-  /** Chrome bookmark ids to place under this category's folder. */
+  /** The 大 root id (bookmark_bar / other) to create `path` under. */
+  rootId: string
+  /** Folder segments to ensure (in order) under the root — e.g. ['karrot','pay']. */
+  path: string[]
+  /** Chrome bookmark ids to place under this path's terminal folder. */
   bookmarkIds: string[]
 }
 
@@ -35,9 +38,3 @@ export interface ApplySummary {
   moved: number
 }
 
-export interface ApplyTarget {
-  /** Top-level folder id the container is created under. */
-  parentId: string
-  /** Container folder name (e.g. "LinkAtlas"). */
-  container: string
-}

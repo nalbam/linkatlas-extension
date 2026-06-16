@@ -52,4 +52,35 @@ describe('OpenAIProvider', () => {
       provider.analyzeBookmark({ title: 't', url: 'https://x.com', domain: 'x.com' }),
     ).rejects.toThrow('Invalid API key')
   })
+
+  it('recategorize sends the whole list and parses assignments', async () => {
+    const recategorizeJson = JSON.stringify({
+      assignments: [
+        { index: 0, path: ['Development'] },
+        { index: 1, path: ['Games', 'Minecraft'] },
+      ],
+    })
+    const fetchImpl = vi.fn<typeof fetch>(async () =>
+      jsonResponse({ choices: [{ message: { content: recategorizeJson } }] }),
+    )
+    const provider = new OpenAIProvider('sk-test', { fetchImpl })
+
+    const result = await provider.recategorize(
+      [
+        { title: 'React', domain: 'react.dev' },
+        { title: 'Minecraft Wiki', domain: 'minecraft.wiki' },
+      ],
+      { targetCount: 10 },
+    )
+
+    expect(result).toEqual([
+      { index: 0, path: ['Development'] },
+      { index: 1, path: ['Games', 'Minecraft'] },
+    ])
+
+    const [, init] = fetchImpl.mock.calls[0]
+    const payload = JSON.parse(init?.body as string)
+    expect(payload.response_format.json_schema.name).toBe('bookmark_recategorization')
+    expect(payload.messages[1].content).toContain('Aim for about 10 top-level categories.')
+  })
 })

@@ -1,10 +1,20 @@
 import {
   ANALYSIS_JSON_SCHEMA,
+  RECATEGORIZE_JSON_SCHEMA,
+  RECATEGORIZE_SYSTEM_PROMPT,
   SYSTEM_PROMPT,
+  buildRecategorizeUserPrompt,
   buildUserPrompt,
   parseAnalysisContent,
+  parseRecategorizeContent,
 } from '../prompts'
-import { type AIProvider, type AnalyzeInput, type BookmarkAnalysis } from '../types'
+import {
+  type AIProvider,
+  type AnalyzeInput,
+  type BookmarkAnalysis,
+  type RecategorizeAssignment,
+  type RecategorizeInput,
+} from '../types'
 
 const DEFAULT_MODEL = 'gpt-4o-mini'
 const ENDPOINT = 'https://api.openai.com/v1/chat/completions'
@@ -70,5 +80,36 @@ export class OpenAIProvider implements AIProvider {
     const content = data.choices?.[0]?.message?.content
     if (!content) throw new Error('OpenAI returned an empty response')
     return parseAnalysisContent(content)
+  }
+
+  async recategorize(
+    inputs: RecategorizeInput[],
+    options: { targetCount?: number } = {},
+  ): Promise<RecategorizeAssignment[]> {
+    const response = await this.fetchImpl(this.endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: this.model,
+        temperature: 0.2,
+        messages: [
+          { role: 'system', content: RECATEGORIZE_SYSTEM_PROMPT },
+          { role: 'user', content: buildRecategorizeUserPrompt(inputs, options.targetCount) },
+        ],
+        response_format: { type: 'json_schema', json_schema: RECATEGORIZE_JSON_SCHEMA },
+      }),
+    })
+
+    const data = (await response.json()) as ChatCompletionResponse
+    if (!response.ok) {
+      throw new Error(data.error?.message ?? `OpenAI request failed (${response.status})`)
+    }
+
+    const content = data.choices?.[0]?.message?.content
+    if (!content) throw new Error('OpenAI returned an empty response')
+    return parseRecategorizeContent(content)
   }
 }
